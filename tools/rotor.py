@@ -8,7 +8,7 @@ class ROTOR_MT_Mirror(bpy.types.WorkSpaceTool):
     bl_idname = 'rotor.mirror_tool'
     bl_label = 'Rotot'
     bl_description = 'Tool for mirroring geometry'
-    bl_icon = (Path(__file__).parent.parent.parent / "icons" / "rotor").as_posix()
+    bl_icon = (Path(__file__).parent.parent / "icons" / "rotor").as_posix()
 
 
     def draw_settings(context, layout, tool):
