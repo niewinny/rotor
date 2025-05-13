@@ -1,11 +1,12 @@
 from bpy.utils import register_class, unregister_class, register_tool, unregister_tool
-from . import btypes, preferences, keymap, ops, tools
+from . import btypes, preferences, keymap, ops, gizmos, tools
 from .icons import load_icons, unload_icons
 
 classes = (
     *btypes.classes,
     *preferences.classes,
     *ops.classes,
+    *gizmos.classes,
     *tools.classes,
 )
 

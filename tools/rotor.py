@@ -3,13 +3,22 @@ from pathlib import Path
 from ..utils import addon
 
 
-types = [('MIRROR', 'Mirror', 'Mirror Modifier'),
+modes = [('MIRROR', 'Mirror', 'Mirror Modifier'),
          ('SYMMETRY','Symmetry', 'Mirror using Symmetry operation')]
 
 
-origines = [('MEDIAN', 'Median Point', 'Mirror Across Median Point of Selected Objects'),
-            ('ACTIVE', 'Active Element', 'Mirror Across Active Element'),
-            ('CURSOR', 'Cursor', 'Mirror Across 3D Cursor')]
+elements = [('OBJECT', 'Objects', 'Mirror Objects ', 'OBJECT_DATAMODE', 1),
+            ('COLLECTION', 'Collections', 'Mirror Collections', 'OUTLINER_COLLECTION', 2)]
+
+
+pivots = [('ACTIVE', 'Active Element', 'Mirror Across Active Element', 'PIVOT_ACTIVE', 1),
+          ('INDIVIDUAL', 'Individual Elements', 'Mirror Across Individual Elements', 'PIVOT_INDIVIDUAL', 2),
+          ('CUSTOM', 'Custom', 'Mirror Across Custom Point', 'RECORD_OFF', 3)]
+
+
+orientations = [('GLOBAL', 'Global', 'Mirror using Global orientation', 'ORIENTATION_GLOBAL', 1),
+                ('LOCAL', 'Local', 'Mirror using Local orientation', 'ORIENTATION_LOCAL', 2),
+                ('CUSTOM', 'Custom', 'Mirror using Custom orientation', 'RECORD_OFF', 3)]
 
 
 
@@ -19,20 +28,60 @@ class ROTOR_MT_Mirror(bpy.types.WorkSpaceTool):
     bl_idname = 'rotor.mirror_tool'
     bl_label = 'Rotor'
     bl_description = 'Tool for mirroring geometry'
+    bl_widget = 'ROTOR_GGT_MirrorGizmoGroup'
     bl_icon = (Path(__file__).parent.parent / "icons" / "mirror").as_posix()
 
 
     def draw_settings(context, layout, tool):
-        rotor = addon.pref().tools.rotor
-        layout.label(text="Mirror:")
+        rotor = addon.pref().tools.mirror
         row = layout.row(align=True)
 
-        label = "None  "
-        _type = rotor.mode
+        row.label(text="Mirror:")
+        label = "None"
+        _type = rotor.element
         match _type:
-            case 'MIRROR': label = "Mirror"
-            case 'SYMMETRY': label = "Symmetry"
-        row.popover('ROTOR_PT_Type', text=label)
+            case 'OBJECT': label, icon = ("Objects",  'OBJECT_DATAMODE')
+            case 'COLLECTION': label, icon = ("Collections",  'OUTLINER_COLLECTION')
+        row.popover('ROTOR_PT_Element', text=label, icon=icon)
+        row.separator()
+
+        row.prop(rotor, 'bisect', text="Bisect", toggle=True)
+
+        row.separator_spacer()
+
+        label = "None"
+        _type = rotor.orientation
+        match _type:
+            case 'GLOBAL': label, icon = ('Global', 'ORIENTATION_GLOBAL')
+            case 'LOCAL': label, icon = ('Local', 'ORIENTATION_LOCAL')
+            case 'CUSTOM': label, icon = ('Custom', 'RECORD_OFF')
+        row.popover('ROTOR_PT_Orientation', text=label, icon=icon)
+
+        label = "None"
+        _type = rotor.pivot
+        match _type:
+            case 'ACTIVE': label, icon = ('Active Element', 'PIVOT_ACTIVE')
+            case 'INDIVIDUAL': label, icon = ('Individual Elements', 'PIVOT_INDIVIDUAL')
+            case 'CUSTOM': label, icon = ('Custom', 'RECORD_OFF')
+        row.popover('ROTOR_PT_Pivot', text='', icon=icon)
+        row.separator()
+
+
+class ROTOR_PT_Element(bpy.types.Panel):
+    bl_label = "Element"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'WINDOW'
+    bl_description = ""
+    bl_context = 'objectmode'
+
+    def draw(self, context):
+        layout = self.layout
+        rotor = addon.pref().tools.mirror
+
+        layout.use_property_split = False
+        col = layout.column(align=True)
+        col.scale_y = 1.6
+        col.prop(rotor, 'element', expand=True)
 
 
 class ROTOR_PT_Type(bpy.types.Panel):
@@ -44,11 +93,15 @@ class ROTOR_PT_Type(bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout
-        rotor = addon.pref().tools.rotor
-        layout.prop(rotor, 'type')
+        rotor = addon.pref().tools.mirror
+
+        layout.use_property_split = False
+        col = layout.column(align=True)
+        col.scale_y = 1.6
+        col.prop(rotor, 'mode', expand=True)
 
 
-class ROTOR_PT_Origin(bpy.types.Panel):
+class ROTOR_PT_Pivot(bpy.types.Panel):
     bl_label = "Type"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'WINDOW'
@@ -57,25 +110,68 @@ class ROTOR_PT_Origin(bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout
-        rotor = addon.pref().tools.rotor
-        layout.prop(rotor, 'origin')
+        rotor = addon.pref().tools.mirror
+
+        layout.use_property_split = False
+        col = layout.column(align=True)
+        col.scale_y = 1.6
+        col.prop(rotor, 'pivot', expand=True)
+
+
+class ROTOR_PT_Orientation(bpy.types.Panel):
+    bl_label = "Type"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'WINDOW'
+    bl_description = ""
+    bl_context = 'objectmode'
+
+    def draw(self, context):
+        layout = self.layout
+        rotor = addon.pref().tools.mirror
+
+        layout.use_property_split = False
+        col = layout.column(align=True)
+        col.scale_y = 1.6
+        col.prop(rotor, 'orientation', expand=True)
 
 
 class Mirror(bpy.types.PropertyGroup):
-    type: bpy.props.EnumProperty(
+    mode: bpy.props.EnumProperty(
         name="Type",
         description="Type of the operation",
-        items=types,
-        default='VISIBLE')
+        items=modes,
+        default='MIRROR')
 
-    origin: bpy.props.EnumProperty(
-        name="Origin",
-        description="Origin of the operation",
-        items=origines, 
-        default='VISIBLE')
+    pivot: bpy.props.EnumProperty(
+        name="Pivot",
+        description="Pivot of the operation",
+        items=pivots, 
+        default='ACTIVE')
 
+    element: bpy.props.EnumProperty(
+        name="Element",
+        description="Element to mirror",
+        items=elements,
+        default='OBJECT')
 
-classes = [
+    orientation: bpy.props.EnumProperty(
+        name="Orientation",
+        description="Orientation of the operation",
+        items=orientations,
+        default='GLOBAL')
+
+    bisect: bpy.props.BoolProperty(
+        name="Bisect",
+        description="Bisect the object",
+        default=True)
+
+types_classes = (
+    Mirror,
+)
+
+classes = (
+    ROTOR_PT_Element,
     ROTOR_PT_Type,
-    ROTOR_PT_Origin,
-]
+    ROTOR_PT_Pivot,
+    ROTOR_PT_Orientation
+)

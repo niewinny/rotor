@@ -17,6 +17,7 @@ class Theme(bpy.types.PropertyGroup):
 
 classes = [
     *ops.types_classes,
+    *tools.types_classes,
     Tools,
     Scene,
     Theme,

@@ -1,1 +1,1 @@
-import addon
+from . import addon

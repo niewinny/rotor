@@ -17,6 +17,7 @@ class Rotor_Preference(bpy.types.AddonPreferences):
     )
 
     theme: bpy.props.PointerProperty(type=btypes.Theme)
+    tools: bpy.props.PointerProperty(type=btypes.Tools)
     
     def draw(self, context):
         layout = self.layout

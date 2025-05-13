@@ -1,6 +1,13 @@
+
 from . import rotor
 
 
-classes = [
-    rotor.classes,
-]
+
+types_classes = (
+    *rotor.types_classes,
+)
+
+
+classes = (
+    *rotor.classes,
+)

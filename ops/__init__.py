@@ -1,4 +1,5 @@
 import bpy
+from . import mirror
 
 
 class Theme(bpy.types.PropertyGroup):
@@ -15,4 +16,5 @@ types_classes = (
 
 
 classes = (
+    *mirror.classes,
 )
