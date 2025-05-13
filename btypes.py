@@ -1,5 +1,11 @@
 import bpy
 from . import ops
+from . import tools
+
+
+class Tools(bpy.types.PropertyGroup):
+    mirror: bpy.props.PointerProperty(type=tools.rotor.Mirror)
+
 
 class Scene(bpy.types.PropertyGroup):
     ops: bpy.props.PointerProperty(type=ops.Scene)
@@ -11,6 +17,7 @@ class Theme(bpy.types.PropertyGroup):
 
 classes = [
     *ops.types_classes,
+    Tools,
     Scene,
     Theme,
 ]

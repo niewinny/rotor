@@ -6,6 +6,7 @@ classes = (
     *btypes.classes,
     *preferences.classes,
     *ops.classes,
+    *tools.classes,
 )
 
 
