@@ -25,7 +25,7 @@ bl_info = {
     'wiki_url': '',
     'category': '3D View'}
 
-from . import registry, preferences, ops, btypes
+from . import registry, preferences, utils, ops, tools, btypes
 
 
 def register():
