@@ -121,17 +121,17 @@ class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
         arrow_colors, arrow_highlights = self._get_arrow_colors_and_highlights(context)
 
         for idx, (axis, axis_name, tag) in enumerate(ARROW_AXES):
+            axis = tag[0].upper()  # 'X', 'Y', 'Z'
+            sign = 'POS' if tag[1] == '+' else 'NEG'
             color = arrow_colors[idx]
             axis_highlight_color = arrow_highlights[idx]
 
             gz_arrow = create_mirror_gizmo(self, axis, color, idx)
             gz_arrow.color_highlight = lighter(axis_highlight_color, 0.5)[:3]
             gz_arrow.alpha_highlight = axis_highlight_color[3]
-            axis_op = tag[0].upper()  # 'X', 'Y', 'Z'
-            sign_op = 'POS' if tag[1] == '+' else 'NEG'
             gz_op = gz_arrow.target_set_operator("rotor.set_mirror_axis")
-            gz_op.axis = axis_op
-            gz_op.sign = sign_op
+            gz_op.axis = axis
+            gz_op.sign = sign
             self.gizmos_arrows.append((gz_arrow, tag))
 
             box_color = getattr(addon.pref().theme.axis, axis_name)
@@ -139,6 +139,8 @@ class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
             gz_box.color_highlight = lighter(box_color, 0.5)[:3]
             gz_box.alpha_highlight = box_color[3]
             gz_op = gz_box.target_set_operator("rotor.add_mirror_axis")
+            gz_op.axis = axis
+            gz_op.sign = sign
             self.gizmos_boxes.append((gz_box, tag))
 
 
@@ -155,13 +157,13 @@ class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
         arrow_colors, arrow_highlights = self._get_arrow_colors_and_highlights(context)
         obj = context.active_object
 
-        for idx, (gz_arrow, box_tag) in enumerate(self.gizmos_arrows):
-            axis, sign = box_tag[0].lower(), 1 if box_tag[1] == '+' else -1
+        for idx, (gz_arrow, tag) in enumerate(self.gizmos_arrows):
+            axis, sign = tag[0].lower(), 1 if tag[1] == '+' else -1
             axis_vec = self._axis_vector(axis, sign)
             axis_world = mat @ axis_vec if orientation == 'LOCAL' and obj else axis_vec
             dot = self._get_dot(camera_pos, origin, axis_world, view_direction, use_perspective)
             alpha_mult = self._get_alpha_mult(dot)
-            arrow_m = axis_matrices[box_tag].to_4x4()
+            arrow_m = axis_matrices[tag].to_4x4()
             if orientation == 'LOCAL' and obj:
                 rot_mat = obj.matrix_world.to_3x3().normalized().to_4x4()
                 arrow_m = rot_mat @ arrow_m
@@ -173,15 +175,15 @@ class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
             gz_arrow.alpha = color[3] * alpha_mult
             gz_arrow.color_highlight = lighter(highlight_color, 0.5)[:3]
             gz_arrow.alpha_highlight = highlight_color[3]
-            self._update_highlight(gz_arrow, box_tag)
+            self._update_highlight(gz_arrow, tag)
 
-        for idx, (gz_box, arrow_tag) in enumerate(self.gizmos_boxes):
-            axis, sign = arrow_tag[0].lower(), 1 if arrow_tag[1] == '+' else -1
+        for idx, (gz_box, tag) in enumerate(self.gizmos_boxes):
+            axis, sign = tag[0].lower(), 1 if tag[1] == '+' else -1
             axis_vec = self._axis_vector(axis, sign)
             axis_world = mat @ axis_vec if orientation == 'LOCAL' and context.active_object else axis_vec
             dot = self._get_dot(camera_pos, origin, axis_world, view_direction, use_perspective)
             alpha_mult = self._get_alpha_mult(dot)
-            box_m = axis_matrices[arrow_tag].to_4x4()
+            box_m = axis_matrices[tag].to_4x4()
             if orientation == 'LOCAL' and context.active_object:
                 rot_mat = context.active_object.matrix_world.to_3x3().normalized().to_4x4()
                 box_m = rot_mat @ box_m
@@ -192,7 +194,7 @@ class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
             gz_box.alpha = box_color[3] * alpha_mult
             gz_box.color_highlight = lighter(box_color, 0.5)[:3]
             gz_box.alpha_highlight = box_color[3]
-            self._update_highlight(gz_box, arrow_tag)
+            self._update_highlight(gz_box, tag)
 
     def _get_origin(self, context, pivot):
         if pivot == 'WORLD':

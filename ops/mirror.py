@@ -25,44 +25,36 @@ class ROTOR_OT_SetMirrorAxis(bpy.types.Operator):
         for obj in context.selected_objects:
             if obj.type != 'MESH':
                 continue
-            # Find or create mirror modifier
-            mirror_mod = None
-            for mod in obj.modifiers:
-                if mod.type == 'MIRROR':
-                    mirror_mod = mod
-            if not mirror_mod:
+
+            # Find existing mirror modifier, or create one
+            mirror_mod = next((m for m in reversed(obj.modifiers) if m.type == 'MIRROR'), None)
+            if mirror_mod is None:
                 mirror_mod = obj.modifiers.new(name="Mirror", type='MIRROR')
-                # Immediately enable the pressed axis and sign
-                mirror_mod.use_axis[axis_idx] = True
-                mirror_mod.use_bisect_flip_axis[axis_idx] = is_neg
-                # Always enable use_bisect_axis when use_axis is enabled
-                if hasattr(mirror_mod, 'use_bisect_axis'):
-                    mirror_mod.use_bisect_axis[axis_idx] = True
-                continue  # Done for this object, no toggle logic needed
-            # Toggle logic
-            if not mirror_mod.use_axis[axis_idx]:
-                # If axis is off, turn it on and set bisect
-                mirror_mod.use_axis[axis_idx] = True
-                mirror_mod.use_bisect_flip_axis[axis_idx] = is_neg
-                if hasattr(mirror_mod, 'use_bisect_axis'):
-                    mirror_mod.use_bisect_axis[axis_idx] = True
+                mirror_mod.use_axis = [False, False, False]
+
+            # Set up axis and bisect options
+            use_axis = mirror_mod.use_axis
+            use_bisect_flip = mirror_mod.use_bisect_flip_axis
+            use_bisect = getattr(mirror_mod, 'use_bisect_axis', None)
+
+            if not use_axis[axis_idx]:
+                use_axis[axis_idx] = True
+                use_bisect_flip[axis_idx] = is_neg
+                if use_bisect is not None:
+                    use_bisect[axis_idx] = True
             else:
-                # If axis is on, toggle bisect or turn off
                 if is_neg:
-                    if mirror_mod.use_bisect_flip_axis[axis_idx]:
-                        # If already negative, turn off axis
-                        mirror_mod.use_axis[axis_idx] = False
-                        mirror_mod.use_bisect_flip_axis[axis_idx] = False
+                    if use_bisect_flip[axis_idx]:
+                        use_axis[axis_idx] = False
+                        use_bisect_flip[axis_idx] = False
                     else:
-                        # Switch to negative
-                        mirror_mod.use_bisect_flip_axis[axis_idx] = True
+                        use_bisect_flip[axis_idx] = True
                 else:
-                    if not mirror_mod.use_bisect_flip_axis[axis_idx]:
-                        # If already positive, turn off axis
-                        mirror_mod.use_axis[axis_idx] = False
+                    if not use_bisect_flip[axis_idx]:
+                        use_axis[axis_idx] = False
                     else:
-                        # Switch to positive
-                        mirror_mod.use_bisect_flip_axis[axis_idx] = False
+                        use_bisect_flip[axis_idx] = False
+
         return {'FINISHED'}
 
 
@@ -90,37 +82,19 @@ class ROTOR_OT_AddMirrorAxis(bpy.types.Operator):
         for obj in context.selected_objects:
             if obj.type != 'MESH':
                 continue
+
+            if obj.modifiers and obj.modifiers[-1].type == 'MIRROR':
+                continue
+
             mirror_mod = obj.modifiers.new(name="Mirror", type='MIRROR')
-            # Immediately enable the pressed axis and sign
+            mirror_mod.use_axis = [False, False, False]
+
             mirror_mod.use_axis[axis_idx] = True
             mirror_mod.use_bisect_flip_axis[axis_idx] = is_neg
-            # Always enable use_bisect_axis when use_axis is enabled
+
             if hasattr(mirror_mod, 'use_bisect_axis'):
                 mirror_mod.use_bisect_axis[axis_idx] = True
-            # Toggle logic
-            if not mirror_mod.use_axis[axis_idx]:
-                # If axis is off, turn it on and set bisect
-                mirror_mod.use_axis[axis_idx] = True
-                mirror_mod.use_bisect_flip_axis[axis_idx] = is_neg
-                if hasattr(mirror_mod, 'use_bisect_axis'):
-                    mirror_mod.use_bisect_axis[axis_idx] = True
-            else:
-                # If axis is on, toggle bisect or turn off
-                if is_neg:
-                    if mirror_mod.use_bisect_flip_axis[axis_idx]:
-                        # If already negative, turn off axis
-                        mirror_mod.use_axis[axis_idx] = False
-                        mirror_mod.use_bisect_flip_axis[axis_idx] = False
-                    else:
-                        # Switch to negative
-                        mirror_mod.use_bisect_flip_axis[axis_idx] = True
-                else:
-                    if not mirror_mod.use_bisect_flip_axis[axis_idx]:
-                        # If already positive, turn off axis
-                        mirror_mod.use_axis[axis_idx] = False
-                    else:
-                        # Switch to positive
-                        mirror_mod.use_bisect_flip_axis[axis_idx] = False
+
         return {'FINISHED'}
 
 
