@@ -13,7 +13,8 @@ elements = [('OBJECT', 'Objects', 'Mirror Objects ', 'OBJECT_DATAMODE', 1),
 
 pivots = [('ACTIVE', 'Active Element', 'Mirror Across Active Element', 'PIVOT_ACTIVE', 1),
           ('INDIVIDUAL', 'Individual Elements', 'Mirror Across Individual Elements', 'PIVOT_INDIVIDUAL', 2),
-          ('CUSTOM', 'Custom', 'Mirror Across Custom Point', 'RECORD_OFF', 3)]
+          ('WORLD', 'World Center', 'Mirror Across World Center', 'WORLD', 3),
+          ('CUSTOM', 'Custom', 'Mirror Across Custom Point', 'RECORD_OFF', 4)]
 
 
 orientations = [('GLOBAL', 'Global', 'Mirror using Global orientation', 'ORIENTATION_GLOBAL', 1),
@@ -45,7 +46,10 @@ class ROTOR_MT_Mirror(bpy.types.WorkSpaceTool):
         row.popover('ROTOR_PT_Element', text=label, icon=icon)
         row.separator()
 
-        row.prop(rotor, 'bisect', text="Bisect", toggle=True)
+        row.prop(rotor, 'new', text="New", toggle=True)
+        row2 = row.row()
+        row2.enabled = rotor.new
+        row2.prop(rotor, 'bisect', text="Bisect", toggle=True)
 
         row.separator_spacer()
 
@@ -62,6 +66,7 @@ class ROTOR_MT_Mirror(bpy.types.WorkSpaceTool):
         match _type:
             case 'ACTIVE': label, icon = ('Active Element', 'PIVOT_ACTIVE')
             case 'INDIVIDUAL': label, icon = ('Individual Elements', 'PIVOT_INDIVIDUAL')
+            case 'WORLD': label, icon = ('World', 'WORLD')
             case 'CUSTOM': label, icon = ('Custom', 'RECORD_OFF')
         row.popover('ROTOR_PT_Pivot', text='', icon=icon)
         row.separator()
@@ -158,11 +163,16 @@ class Mirror(bpy.types.PropertyGroup):
         name="Orientation",
         description="Orientation of the operation",
         items=orientations,
-        default='GLOBAL')
+        default='LOCAL')
+
+    new: bpy.props.BoolProperty(
+        name="New modifier",
+        description="Adds a new mirror modifier with the specified axis",
+        default=False)
 
     bisect: bpy.props.BoolProperty(
         name="Bisect",
-        description="Bisect the object",
+        description="Bisect the object using specified axis",
         default=True)
 
 types_classes = (
