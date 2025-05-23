@@ -46,8 +46,7 @@ class ROTOR_MT_Mirror(bpy.types.WorkSpaceTool):
         row.popover('ROTOR_PT_Element', text=label, icon=icon)
         row.separator()
 
-        if rotor.element == 'OBJECT':
-            row.prop(rotor, 'bisect', text="Bisect", toggle=True)
+        row.prop(rotor, 'bisect', text="Bisect")
 
         row.separator_spacer()
 

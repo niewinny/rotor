@@ -1,4 +1,5 @@
 import bpy
+import bmesh
 from ..utils import addon
 from mathutils import Matrix, Vector
 
@@ -81,6 +82,9 @@ class ROTOR_OT_SetMirrorAxis(bpy.types.Operator):
             # Find existing mirror modifier, or create one
             mirror_mod = next((m for m in reversed(obj.modifiers) if m.type == 'MIRROR'), None)
             if mirror_mod is None:
+                if pref.bisect:
+                    _bisect_object(obj, axis_idx, pivot, orientation, context)
+
                 _create_mirror_modifier(context, obj, mirror_object, individual, axis_idx, is_neg)
                 continue
 
@@ -130,6 +134,9 @@ class ROTOR_OT_AddMirrorAxis(bpy.types.Operator):
             if obj.modifiers and obj.modifiers[-1].type == 'MIRROR':
                 continue
 
+            if pref.bisect:
+                _bisect_object(obj, axis_idx, pivot, orientation, context)
+
             _create_mirror_modifier(context, obj, mirror_object, individual, axis_idx, is_neg)
 
         return {'FINISHED'}
@@ -176,6 +183,12 @@ class ROTOR_OT_AddMirrorCollection(bpy.types.Operator):
             if col in created:
                 continue
             created.add(col)
+
+            # Perform bisect operation if preference is enabled
+            if pref.bisect:
+                mesh_objects = [obj for obj in col.objects if obj.type == 'MESH']
+                for obj in mesh_objects:
+                    _bisect_object(obj, axis_idx, pivot, orientation, context)
 
             # Create an empty to instance the collection
             empty = bpy.data.objects.new(f"RotorMirrorInstance_{col.name}", None)
@@ -287,6 +300,68 @@ def _create_empty_mirror_object(context, location, orientation=(0.0, 0.0, 0.0)):
     empty.rotation_euler = orientation
     context.collection.objects.link(empty)
     return empty
+
+
+def _bisect_object(obj, axis_idx, pivot, orientation, context):
+    """Bisect a single object using bmesh.ops.bisect_plane without changing modes"""
+    
+    if obj.type != 'MESH':
+        return
+    
+    # Get the bisect plane normal vector
+    normal = Vector((0, 0, 0))
+    normal[axis_idx] = 1.0
+    
+    # Get the pivot point
+    if pivot == 'WORLD':
+        pivot_point = Vector((0, 0, 0))
+    elif pivot == 'ACTIVE' and context.active_object:
+        pivot_point = context.active_object.location.copy()
+    elif pivot == 'INDIVIDUAL':
+        pivot_point = obj.location.copy()
+    else:
+        pivot_point = Vector((0, 0, 0))
+    
+    # Transform normal based on orientation
+    obj_normal = normal.copy()
+    if orientation == 'LOCAL':
+        if pivot == 'ACTIVE' and context.active_object:
+            # Use active object's rotation to transform the normal
+            rot_mat = context.active_object.rotation_euler.to_matrix()
+            obj_normal = rot_mat @ obj_normal
+        elif pivot == 'INDIVIDUAL':
+            # Use this object's rotation to transform the normal
+            rot_mat = obj.rotation_euler.to_matrix()
+            obj_normal = rot_mat @ obj_normal
+    
+    # Create new bmesh from mesh
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    
+    # Transform pivot point to object's local space
+    world_to_local = obj.matrix_world.inverted()
+    local_pivot = world_to_local @ pivot_point
+    
+    # Transform normal to object's local space  
+    local_normal = world_to_local.to_3x3() @ obj_normal
+    local_normal.normalize()
+    
+    # Perform bisect operation
+    bmesh.ops.bisect_plane(
+        bm,
+        geom=bm.verts[:] + bm.edges[:] + bm.faces[:],
+        plane_co=local_pivot,
+        plane_no=local_normal,
+        clear_inner=True,
+        clear_outer=False
+    )
+    
+    # Update mesh and free bmesh
+    bm.to_mesh(obj.data)
+    bm.free()
+    
+    # Update object
+    obj.data.update()
 
 
 classes = (
