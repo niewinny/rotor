@@ -16,6 +16,7 @@ class ThemeAxis(bpy.types.PropertyGroup):
     y: bpy.props.FloatVectorProperty(name="Y", description="Y axis colo", default=(0.545, 0.863, 0.0, 0.8), subtype='COLOR', size=4, min=0.0, max=1.0)
     z: bpy.props.FloatVectorProperty(name="Z", description="Z axis colo", default=(0.157, 0.564, 1.0, 0.8), subtype='COLOR', size=4, min=0.0, max=1.0)
     g: bpy.props.FloatVectorProperty(name="G", description="gray", default=(0.12, 0.12, 0.12, 0.8), subtype='COLOR', size=4, min=0.0, max=1.0)
+    n: bpy.props.FloatVectorProperty(name="N", description="yellow", default=(0.85, 0.75, 0.0, 0.8), subtype='COLOR', size=4, min=0.0, max=1.0)
 
 
 class Theme(bpy.types.PropertyGroup):

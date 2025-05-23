@@ -22,6 +22,21 @@ def lighter(color, amt=0.5):
     )
 
 
+def create_collection_gizmo(group, axis, color, idx):
+    gz = group.gizmos.new("GIZMO_GT_arrow_3d")
+    gz.color = color[:3]
+    gz.alpha = color[3]
+    gz.color_highlight = lighter(color, 0.5)[:3]
+    gz.alpha_highlight = color[3]
+    gz.scale_basis = 1.2
+    gz.use_draw_modal = False
+    gz.hide_select = False
+    gz.length = 1.1
+    gz.matrix_basis = Matrix.Identity(4)
+    gz.draw_style = 'BOX'
+    return gz
+
+
 def create_mirror_gizmo(group, axis, color, idx):
     gz = group.gizmos.new("GIZMO_GT_arrow_3d")
     gz.color = color[:3]
@@ -69,6 +84,8 @@ class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
         self.last_highlighted_tag = None
         self.gizmos_arrows = []
         self.gizmos_boxes = []
+        self.gizmos_colelction_arrows = []
+
 
     @classmethod
     def poll(cls, context) -> bool:
@@ -118,7 +135,14 @@ class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
         """Create axis arrow gizmos with color logic based on mirror modifier, and box gizmos with always axis color."""
         self.gizmos_arrows.clear()
         self.gizmos_boxes.clear()
+        self.gizmos_colelction_arrows.clear()
+
         arrow_colors, arrow_highlights = self._get_arrow_colors_and_highlights(context)
+
+        theme_axis = addon.pref().theme.axis
+        element = addon.pref().tools.mirror.element
+        hide_collection_gizmos = True if element == 'OBJECT' else False
+        hide_mirror_gizmos = True if element == 'COLLECTION' else False
 
         for idx, (axis, axis_name, tag) in enumerate(ARROW_AXES):
             axis = tag[0].upper()  # 'X', 'Y', 'Z'
@@ -132,15 +156,27 @@ class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
             gz_op = gz_arrow.target_set_operator("rotor.set_mirror_axis")
             gz_op.axis = axis
             gz_op.sign = sign
+            gz_arrow.hide = hide_mirror_gizmos
             self.gizmos_arrows.append((gz_arrow, tag))
 
-            box_color = getattr(addon.pref().theme.axis, axis_name)
-            gz_box = set_mirror_gizmo(self, axis, box_color, idx)
-            gz_box.color_highlight = lighter(box_color, 0.5)[:3]
-            gz_box.alpha_highlight = box_color[3]
+            main_color = theme_axis.n
+            gz_collection_arrow = create_collection_gizmo(self, axis, main_color, idx)
+            gz_collection_arrow.color_highlight = lighter(color, 0.5)[:3]
+            gz_collection_arrow.alpha_highlight = color[3]
+            gz_op = gz_collection_arrow.target_set_operator("rotor.add_mirror_collection")
+            gz_op.axis = axis
+            gz_op.sign = sign
+            gz_collection_arrow.hide = hide_collection_gizmos
+            self.gizmos_colelction_arrows.append((gz_collection_arrow, tag))
+
+            main_color = getattr(addon.pref().theme.axis, axis_name)
+            gz_box = set_mirror_gizmo(self, axis, main_color, idx)
+            gz_box.color_highlight = lighter(color, 0.5)[:3]
+            gz_box.alpha_highlight = color[3]
             gz_op = gz_box.target_set_operator("rotor.add_mirror_axis")
             gz_op.axis = axis
             gz_op.sign = sign
+            gz_box.hide_select = hide_mirror_gizmos
             self.gizmos_boxes.append((gz_box, tag))
 
 
@@ -156,6 +192,30 @@ class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
         axis_matrices = self._get_axis_matrices()
         arrow_colors, arrow_highlights = self._get_arrow_colors_and_highlights(context)
         obj = context.active_object
+
+        hide_collection_gizmos = True if mirror_tool.element == 'OBJECT' else False
+        hide_mirror_gizmos = True if mirror_tool.element == 'COLLECTION' else False
+
+        for idx, (gz_arrow, tag) in enumerate(self.gizmos_colelction_arrows):
+            axis, sign = tag[0].lower(), 1 if tag[1] == '+' else -1
+            axis_vec = self._axis_vector(axis, sign)
+            axis_world = mat @ axis_vec if orientation == 'LOCAL' and obj else axis_vec
+            dot = self._get_dot(camera_pos, origin, axis_world, view_direction, use_perspective)
+            alpha_mult = self._get_alpha_mult(dot)
+            arrow_m = axis_matrices[tag].to_4x4()
+            if orientation == 'LOCAL' and obj:
+                rot_mat = obj.matrix_world.to_3x3().normalized().to_4x4()
+                arrow_m = rot_mat @ arrow_m
+            arrow_m.translation = origin
+            gz_arrow.matrix_basis = arrow_m
+            color = getattr(addon.pref().theme.axis, 'n')
+            highlight_color = arrow_highlights[idx]
+            gz_arrow.color = color[:3]
+            gz_arrow.alpha = color[3] * alpha_mult
+            gz_arrow.color_highlight = lighter(highlight_color, 0.5)[:3]
+            gz_arrow.alpha_highlight = highlight_color[3]
+            gz_arrow.hide = hide_collection_gizmos
+            self._update_highlight(gz_arrow, tag)
 
         for idx, (gz_arrow, tag) in enumerate(self.gizmos_arrows):
             axis, sign = tag[0].lower(), 1 if tag[1] == '+' else -1
@@ -175,6 +235,7 @@ class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
             gz_arrow.alpha = color[3] * alpha_mult
             gz_arrow.color_highlight = lighter(highlight_color, 0.5)[:3]
             gz_arrow.alpha_highlight = highlight_color[3]
+            gz_arrow.hide = hide_mirror_gizmos
             self._update_highlight(gz_arrow, tag)
 
         for idx, (gz_box, tag) in enumerate(self.gizmos_boxes):
@@ -194,6 +255,7 @@ class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
             gz_box.alpha = box_color[3] * alpha_mult
             gz_box.color_highlight = lighter(box_color, 0.5)[:3]
             gz_box.alpha_highlight = box_color[3]
+            gz_box.hide_select = hide_mirror_gizmos
             self._update_highlight(gz_box, tag)
 
     def _get_origin(self, context, pivot):

@@ -8,10 +8,8 @@ def object_mode_hotkeys(kc):
 
     km = kc.keymaps.new(name='Object Mode', space_type='EMPTY')
     # menu hotkey 
-    kmi = km.keymap_items.new('wm.call_menu', 'I', 'PRESS')
-    kmi.properties.name = 'MORF_MT_Imagine'
+    kmi = km.keymap_items.new('rotor.set_active_tool', 'X', 'PRESS',  alt=True)
     keys.append((km, kmi))
-
 
 def register():
     '''Register Keymaps'''

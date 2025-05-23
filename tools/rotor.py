@@ -46,15 +46,12 @@ class ROTOR_MT_Mirror(bpy.types.WorkSpaceTool):
         row.popover('ROTOR_PT_Element', text=label, icon=icon)
         row.separator()
 
-        row.prop(rotor, 'new', text="New", toggle=True)
-        row2 = row.row()
-        row2.enabled = rotor.new
-        row2.prop(rotor, 'bisect', text="Bisect", toggle=True)
+        if rotor.element == 'OBJECT':
+            row.prop(rotor, 'bisect', text="Bisect", toggle=True)
 
         row.separator_spacer()
 
         label = "None"
-        _type = rotor.orientation
         match _type:
             case 'GLOBAL': label, icon = ('Global', 'ORIENTATION_GLOBAL')
             case 'LOCAL': label, icon = ('Local', 'ORIENTATION_LOCAL')
@@ -165,15 +162,10 @@ class Mirror(bpy.types.PropertyGroup):
         items=orientations,
         default='LOCAL')
 
-    new: bpy.props.BoolProperty(
-        name="New modifier",
-        description="Adds a new mirror modifier with the specified axis",
-        default=False)
-
     bisect: bpy.props.BoolProperty(
         name="Bisect",
         description="Bisect the object using specified axis",
-        default=True)
+        default=False)
 
 types_classes = (
     Mirror,

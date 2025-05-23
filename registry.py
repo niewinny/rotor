@@ -20,11 +20,11 @@ def register():
     register_tool(tools.rotor.ROTOR_MT_Mirror, group=False, separator=False)
 
     btypes.register()
-    # keymap.register() 
+    keymap.register()
 
 
 def unregister():
-    # keymap.unregister()
+    keymap.unregister()
 
     unregister_tool(tools.rotor.ROTOR_MT_Mirror)
 
