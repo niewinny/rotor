@@ -52,6 +52,7 @@ class ROTOR_MT_Mirror(bpy.types.WorkSpaceTool):
         row.separator_spacer()
 
         label = "None"
+        _type = rotor.orientation
         match _type:
             case 'GLOBAL': label, icon = ('Global', 'ORIENTATION_GLOBAL')
             case 'LOCAL': label, icon = ('Local', 'ORIENTATION_LOCAL')
