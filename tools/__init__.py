@@ -1,13 +1,13 @@
 
-from . import rotor
+from . import mirror
 
 
 
 types_classes = (
-    *rotor.types_classes,
+    *mirror.types_classes,
 )
 
 
 classes = (
-    *rotor.classes,
+    *mirror.classes,
 )

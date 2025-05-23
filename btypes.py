@@ -4,7 +4,7 @@ from . import tools
 
 
 class Tools(bpy.types.PropertyGroup):
-    mirror: bpy.props.PointerProperty(type=tools.rotor.Mirror)
+    mirror: bpy.props.PointerProperty(type=tools.mirror.Mirror)
 
 
 class Scene(bpy.types.PropertyGroup):
