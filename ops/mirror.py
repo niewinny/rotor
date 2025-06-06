@@ -71,6 +71,9 @@ class ROTOR_OT_SetMirrorAxis(bpy.types.Operator):
             use_bisect_flip[axis_idx] = new_bisect_flip
             use_bisect[axis_idx] = True
 
+        mirror_object = None
+        individual = False
+
         mirror_mod = next((m for m in reversed(active_object.modifiers) if m.type == 'MIRROR'), None)
         if mirror_mod is None:
             mirror_object, individual = _get_mirror_object(context, active_object, pivot, orientation)
@@ -78,7 +81,6 @@ class ROTOR_OT_SetMirrorAxis(bpy.types.Operator):
         for obj in context.selected_objects:
             if obj.type != 'MESH':
                 continue
-
             # Find existing mirror modifier, or create one
             mirror_mod = next((m for m in reversed(obj.modifiers) if m.type == 'MIRROR'), None)
             if mirror_mod is None:
@@ -100,6 +102,7 @@ class ROTOR_OT_SetMirrorAxis(bpy.types.Operator):
 
 
 class ROTOR_OT_AddMirrorAxis(bpy.types.Operator):
+    """Add new mirror"""
     bl_idname = "rotor.add_mirror_axis"
     bl_label = "Rotor Mirror Axis"
     bl_options = {'REGISTER', 'UNDO'}
@@ -131,8 +134,6 @@ class ROTOR_OT_AddMirrorAxis(bpy.types.Operator):
             if obj.type != 'MESH':
                 continue
 
-            if obj.modifiers and obj.modifiers[-1].type == 'MIRROR':
-                continue
 
             if pref.bisect:
                 _bisect_object(obj, axis_idx, pivot, orientation, context)
@@ -288,7 +289,7 @@ def _create_mirror_modifier(context, obj, mirror_object, individual, axis_idx, i
     mirror_mod.use_bisect_axis[axis_idx] = True
 
     mirror_mod.mirror_object = _mirror_object
-
+    mirror_mod.show_expanded = False
 
 
 def _create_empty_mirror_object(context, location, orientation=(0.0, 0.0, 0.0)):

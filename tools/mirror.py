@@ -27,7 +27,7 @@ class ROTOR_MT_Mirror(bpy.types.WorkSpaceTool):
     bl_space_type = 'VIEW_3D'
     bl_context_mode = 'OBJECT'
     bl_idname = 'rotor.mirror_tool'
-    bl_label = 'Rotor'
+    bl_label = 'Rotor: Mirror'
     bl_description = 'Tool for mirroring geometry'
     bl_widget = 'ROTOR_GGT_MirrorGizmoGroup'
     bl_icon = (Path(__file__).parent.parent / "icons" / "mirror").as_posix()

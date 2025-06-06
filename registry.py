@@ -17,7 +17,8 @@ def register():
     for cls in classes:
         register_class(cls)
 
-    register_tool(tools.mirror.ROTOR_MT_Mirror, group=False, separator=False)
+    register_tool(tools.mirror.ROTOR_MT_Mirror, group=True, separator=False)
+    register_tool(tools.array.ROTOR_MT_Array, after={"rotor.mirror_tool"}, group=False, separator=False)
 
     btypes.register()
     keymap.register()
@@ -27,6 +28,7 @@ def unregister():
     keymap.unregister()
 
     unregister_tool(tools.mirror.ROTOR_MT_Mirror)
+    unregister_tool(tools.array.ROTOR_MT_Array)
 
     for cls in reversed(classes):
         unregister_class(cls)
