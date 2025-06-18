@@ -305,14 +305,14 @@ def _create_empty_mirror_object(context, location, orientation=(0.0, 0.0, 0.0)):
 
 def _bisect_object(obj, axis_idx, pivot, orientation, context):
     """Bisect a single object using bmesh.ops.bisect_plane without changing modes"""
-    
+
     if obj.type != 'MESH':
         return
-    
+
     # Get the bisect plane normal vector
     normal = Vector((0, 0, 0))
     normal[axis_idx] = 1.0
-    
+
     # Get the pivot point
     if pivot == 'WORLD':
         pivot_point = Vector((0, 0, 0))
@@ -322,7 +322,7 @@ def _bisect_object(obj, axis_idx, pivot, orientation, context):
         pivot_point = obj.location.copy()
     else:
         pivot_point = Vector((0, 0, 0))
-    
+
     # Transform normal based on orientation
     obj_normal = normal.copy()
     if orientation == 'LOCAL':
@@ -334,19 +334,19 @@ def _bisect_object(obj, axis_idx, pivot, orientation, context):
             # Use this object's rotation to transform the normal
             rot_mat = obj.rotation_euler.to_matrix()
             obj_normal = rot_mat @ obj_normal
-    
+
     # Create new bmesh from mesh
     bm = bmesh.new()
     bm.from_mesh(obj.data)
-    
+
     # Transform pivot point to object's local space
     world_to_local = obj.matrix_world.inverted()
     local_pivot = world_to_local @ pivot_point
-    
-    # Transform normal to object's local space  
+
+    # Transform normal to object's local space
     local_normal = world_to_local.to_3x3() @ obj_normal
     local_normal.normalize()
-    
+
     # Perform bisect operation
     bmesh.ops.bisect_plane(
         bm,
@@ -356,11 +356,11 @@ def _bisect_object(obj, axis_idx, pivot, orientation, context):
         clear_inner=True,
         clear_outer=False
     )
-    
+
     # Update mesh and free bmesh
     bm.to_mesh(obj.data)
     bm.free()
-    
+
     # Update object
     obj.data.update()
 
