@@ -6,6 +6,19 @@ from ..utils import addon
 from mathutils import Matrix, Vector
 
 
+# Mirror axis state transition table
+# Key: (use_axis, use_bisect_flip, is_neg)
+# Value: (new_use_axis, new_use_bisect_flip)
+MIRROR_AXIS_TRANSITIONS = {
+    (False, False, False): (True, False),   # Enable positive
+    (False, False, True):  (True, True),    # Enable negative
+    (True, False, False):  (False, False),  # Disable from positive
+    (True, False, True):   (True, True),    # Switch to negative
+    (True, True, False):   (True, False),   # Switch to positive
+    (True, True, True):    (False, False),  # Disable from negative
+}
+
+
 class ROTOR_PG_MirrorObjectItem(PropertyGroup):
     """Property group for object items in mirror operations"""
     name: StringProperty(name="Object Name")
@@ -102,15 +115,7 @@ class ROTOR_OT_SetMirrorAxis(bpy.types.Operator):
                 current_state = (active_mirror_mod.use_axis[axis_idx], 
                                active_mirror_mod.use_bisect_flip_axis[axis_idx], 
                                is_neg)
-                transitions = {
-                    (False, False, False): (True, False),
-                    (False, False, True):  (True, True),
-                    (True, False, False):  (False, False),  # Disabling
-                    (True, False, True):   (True, True),
-                    (True, True, False):   (True, False),
-                    (True, True, True):    (False, False),  # Disabling
-                }
-                new_axis, _ = transitions[current_state]
+                new_axis, _ = MIRROR_AXIS_TRANSITIONS[current_state]
                 is_disabling = (active_mirror_mod.use_axis[axis_idx] and not new_axis)
         
         # Add active object first if it's a mesh
@@ -191,40 +196,9 @@ class ROTOR_OT_SetMirrorAxis(bpy.types.Operator):
 
 
         def toggle_axis(use_axis, use_bisect_flip, use_bisect, axis_idx, is_neg):
-            # State: (use_axis, use_bisect_flip, is_neg)
-            # Value: (new_use_axis, new_use_bisect_flip)
-
-            # Transition table schema:
-            # Each key is a tuple: (use_axis, use_bisect_flip, is_neg)
-            #   use_axis:         Is the mirror axis currently enabled? (bool)
-            #   use_bisect_flip:  Is bisect flip enabled for this axis? (bool)
-            #   is_neg:           Are we toggling the negative direction? (bool)
-            #
-            # Each value is a tuple: (new_use_axis, new_use_bisect_flip)
-            #   new_use_axis:         New value for use_axis after toggle
-            #   new_use_bisect_flip:  New value for use_bisect_flip after toggle
-            #
-            # Table summary:
-            # | use_axis | use_bisect_flip | is_neg | new_use_axis | new_use_bisect_flip |
-            # |----------|-----------------|--------|--------------|---------------------|
-            # |  False   |     False       | False  |    True      |      False          |
-            # |  False   |     False       | True   |    True      |      True           |
-            # |  True    |     False       | False  |    False     |      False          |
-            # |  True    |     False       | True   |    True      |      True           |
-            # |  True    |     True        | False  |    True      |      False          |
-            # |  True    |     True        | True   |    False     |      False          |
-
-
-            transitions = {
-                (False, False, False): (True, False),
-                (False, False, True):  (True, True),
-                (True, False, False):  (False, False),
-                (True, False, True):   (True, True),
-                (True, True, False):   (True, False),
-                (True, True, True):    (False, False),
-            }
+            # Apply transition based on current state
             key = (use_axis[axis_idx], use_bisect_flip[axis_idx], is_neg)
-            new_axis, new_bisect_flip = transitions[key]
+            new_axis, new_bisect_flip = MIRROR_AXIS_TRANSITIONS[key]
             use_axis[axis_idx] = new_axis
             use_bisect_flip[axis_idx] = new_bisect_flip
             use_bisect[axis_idx] = True
@@ -238,16 +212,7 @@ class ROTOR_OT_SetMirrorAxis(bpy.types.Operator):
             current_state = (active_mirror_mod.use_axis[axis_idx], 
                            active_mirror_mod.use_bisect_flip_axis[axis_idx], 
                            is_neg)
-            # Check transition table to see if we're disabling
-            transitions = {
-                (False, False, False): (True, False),
-                (False, False, True):  (True, True),
-                (True, False, False):  (False, False),  # Disabling
-                (True, False, True):   (True, True),
-                (True, True, False):   (True, False),
-                (True, True, True):    (False, False),  # Disabling
-            }
-            new_axis, _ = transitions[current_state]
+            new_axis, _ = MIRROR_AXIS_TRANSITIONS[current_state]
             is_disabling = (active_mirror_mod.use_axis[axis_idx] and not new_axis)
         
         # Always calculate mirror object based on current settings
@@ -395,14 +360,17 @@ class ROTOR_OT_AddMirrorAxis(bpy.types.Operator):
             # First run - use all selected mesh objects
             enabled_objects = [obj for obj in context.selected_objects if obj.type == 'MESH']
         
+        affected_count = 0
         for obj in enabled_objects:
-
-
             if pref.bisect:
                 _bisect_object(obj, axis_idx, pivot, orientation, context)
 
             _create_mirror_modifier(context, obj, mirror_object, individual, axis_idx, is_neg)
+            affected_count += 1
 
+        # Report success
+        self.report({'INFO'}, f"Added mirror modifiers to {affected_count} objects.")
+        
         return {'FINISHED'}
 
 
@@ -562,6 +530,12 @@ class ROTOR_OT_AddMirrorCollection(bpy.types.Operator):
             # Link empty to the Scene Collection, not to the instanced collection
             bpy.context.scene.collection.objects.link(empty)
 
+        # Report success
+        if len(created) > 0:
+            self.report({'INFO'}, f"Mirrored {len(created)} collections.")
+        else:
+            self.report({'WARNING'}, "No collections were mirrored.")
+            
         return {'FINISHED'}
 
 
