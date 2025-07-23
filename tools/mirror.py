@@ -14,12 +14,12 @@ elements = [('OBJECT', 'Objects', 'Mirror Objects ', 'OBJECT_DATAMODE', 1),
 pivots = [('ACTIVE', 'Active Element', 'Mirror Across Active Element', 'PIVOT_ACTIVE', 1),
           ('INDIVIDUAL', 'Individual Elements', 'Mirror Across Individual Elements', 'PIVOT_INDIVIDUAL', 2),
           ('WORLD', 'World Center', 'Mirror Across World Center', 'WORLD', 3),
-          ('CUSTOM', 'Custom', 'Mirror Across Custom Point', 'RECORD_OFF', 4)]
+          ('CURSOR', 'Cursor', 'Mirror Across 3D Cursor', 'CURSOR', 4)]
 
 
 orientations = [('GLOBAL', 'Global', 'Mirror using Global orientation', 'ORIENTATION_GLOBAL', 1),
                 ('LOCAL', 'Local', 'Mirror using Local orientation', 'ORIENTATION_LOCAL', 2),
-                ('CUSTOM', 'Custom', 'Mirror using Custom orientation', 'RECORD_OFF', 3)]
+                ('CURSOR', 'Cursor', 'Mirror using 3D Cursor orientation', 'ORIENTATION_CURSOR', 3)]
 
 
 
@@ -55,7 +55,7 @@ class ROTOR_MT_Mirror(bpy.types.WorkSpaceTool):
         match _type:
             case 'GLOBAL': label, icon = ('Global', 'ORIENTATION_GLOBAL')
             case 'LOCAL': label, icon = ('Local', 'ORIENTATION_LOCAL')
-            case 'CUSTOM': label, icon = ('Custom', 'RECORD_OFF')
+            case 'CURSOR': label, icon = ('Cursor', 'ORIENTATION_CURSOR')
         row.popover('ROTOR_PT_Orientation', text=label, icon=icon)
 
         label = "None"
@@ -64,7 +64,7 @@ class ROTOR_MT_Mirror(bpy.types.WorkSpaceTool):
             case 'ACTIVE': label, icon = ('Active Element', 'PIVOT_ACTIVE')
             case 'INDIVIDUAL': label, icon = ('Individual Elements', 'PIVOT_INDIVIDUAL')
             case 'WORLD': label, icon = ('World', 'WORLD')
-            case 'CUSTOM': label, icon = ('Custom', 'RECORD_OFF')
+            case 'CURSOR': label, icon = ('Cursor', 'CURSOR')
         row.popover('ROTOR_PT_Pivot', text='', icon=icon)
         row.separator()
 

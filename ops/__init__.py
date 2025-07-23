@@ -1,6 +1,5 @@
 import bpy
 from . import mirror
-from . import array
 from . import set_tool
 
 
@@ -19,6 +18,5 @@ types_classes = (
 
 classes = (
     *mirror.classes,
-    *array.classes,
     *set_tool.classes,
 )

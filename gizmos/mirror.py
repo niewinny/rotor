@@ -199,12 +199,15 @@ class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
         for idx, (gz_arrow, tag) in enumerate(self.gizmos_colelction_arrows):
             axis, sign = tag[0].lower(), 1 if tag[1] == '+' else -1
             axis_vec = self._axis_vector(axis, sign)
-            axis_world = mat @ axis_vec if orientation == 'LOCAL' and obj else axis_vec
+            axis_world = mat @ axis_vec if orientation in ('LOCAL', 'CURSOR') else axis_vec
             dot = self._get_dot(camera_pos, origin, axis_world, view_direction, use_perspective)
             alpha_mult = self._get_alpha_mult(dot)
             arrow_m = axis_matrices[tag].to_4x4()
             if orientation == 'LOCAL' and obj:
                 rot_mat = obj.matrix_world.to_3x3().normalized().to_4x4()
+                arrow_m = rot_mat @ arrow_m
+            elif orientation == 'CURSOR':
+                rot_mat = context.scene.cursor.rotation_euler.to_matrix().to_4x4()
                 arrow_m = rot_mat @ arrow_m
             arrow_m.translation = origin
             gz_arrow.matrix_basis = arrow_m
@@ -220,12 +223,15 @@ class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
         for idx, (gz_arrow, tag) in enumerate(self.gizmos_arrows):
             axis, sign = tag[0].lower(), 1 if tag[1] == '+' else -1
             axis_vec = self._axis_vector(axis, sign)
-            axis_world = mat @ axis_vec if orientation == 'LOCAL' and obj else axis_vec
+            axis_world = mat @ axis_vec if orientation in ('LOCAL', 'CURSOR') else axis_vec
             dot = self._get_dot(camera_pos, origin, axis_world, view_direction, use_perspective)
             alpha_mult = self._get_alpha_mult(dot)
             arrow_m = axis_matrices[tag].to_4x4()
             if orientation == 'LOCAL' and obj:
                 rot_mat = obj.matrix_world.to_3x3().normalized().to_4x4()
+                arrow_m = rot_mat @ arrow_m
+            elif orientation == 'CURSOR':
+                rot_mat = context.scene.cursor.rotation_euler.to_matrix().to_4x4()
                 arrow_m = rot_mat @ arrow_m
             arrow_m.translation = origin
             gz_arrow.matrix_basis = arrow_m
@@ -241,12 +247,15 @@ class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
         for idx, (gz_box, tag) in enumerate(self.gizmos_boxes):
             axis, sign = tag[0].lower(), 1 if tag[1] == '+' else -1
             axis_vec = self._axis_vector(axis, sign)
-            axis_world = mat @ axis_vec if orientation == 'LOCAL' and context.active_object else axis_vec
+            axis_world = mat @ axis_vec if orientation in ('LOCAL', 'CURSOR') else axis_vec
             dot = self._get_dot(camera_pos, origin, axis_world, view_direction, use_perspective)
             alpha_mult = self._get_alpha_mult(dot)
             box_m = axis_matrices[tag].to_4x4()
             if orientation == 'LOCAL' and context.active_object:
                 rot_mat = context.active_object.matrix_world.to_3x3().normalized().to_4x4()
+                box_m = rot_mat @ box_m
+            elif orientation == 'CURSOR':
+                rot_mat = context.scene.cursor.rotation_euler.to_matrix().to_4x4()
                 box_m = rot_mat @ box_m
             box_m.translation = origin
             gz_box.matrix_basis = box_m
@@ -263,6 +272,8 @@ class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
             return Vector((0, 0, 0))
         elif pivot == 'ACTIVE' and context.active_object:
             return context.active_object.matrix_world.translation
+        elif pivot == 'CURSOR':
+            return context.scene.cursor.location
         elif context.active_object:
             return context.active_object.matrix_world.translation
         return Vector((0, 0, 0))
@@ -272,6 +283,8 @@ class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
             return Matrix.Identity(3)
         elif orientation == 'LOCAL' and context.active_object:
             return context.active_object.matrix_world.to_3x3().normalized()
+        elif orientation == 'CURSOR':
+            return context.scene.cursor.rotation_euler.to_matrix()
         return Matrix.Identity(3)
 
     def _get_camera_info(self, context, origin):
