@@ -13,6 +13,7 @@ class Scene(bpy.types.PropertyGroup):
 types_classes = (
     Scene,
     Theme,
+    *mirror.types_classes,
 )
 
 

@@ -1,7 +1,65 @@
 import bpy
 import bmesh
+from bpy.props import BoolProperty, CollectionProperty, StringProperty, IntProperty
+from bpy.types import PropertyGroup, UIList
 from ..utils import addon
 from mathutils import Matrix, Vector
+
+
+class ROTOR_PG_MirrorObjectItem(PropertyGroup):
+    """Property group for object items in mirror operations"""
+    name: StringProperty(name="Object Name")
+    enabled: BoolProperty(name="Enabled", default=True)
+    has_mirror_modifier: BoolProperty(name="Has Mirror Modifier", default=False)
+
+
+class ROTOR_PG_MirrorCollectionItem(PropertyGroup):
+    """Property group for collection items in mirror operations"""
+    name: StringProperty(name="Collection Name")
+    enabled: BoolProperty(name="Enabled", default=True)
+
+
+class ROTOR_UL_MirrorObjectList(UIList):
+    """UIList for displaying mirror objects"""
+    
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
+        if self.layout_type in {'DEFAULT', 'COMPACT'}:
+            row = layout.row(align=True)
+            
+            # Get the operator's is_disabling state
+            is_disabling = getattr(data, 'is_disabling', False)
+            
+            # Check if object has mirror modifier to enable/disable checkbox
+            if not item.has_mirror_modifier and is_disabling:
+                # Only disable if we're trying to disable and object has no modifier
+                row.enabled = False
+            
+            row.prop(item, "enabled", text="")
+            
+            # Choose icon based on active object and mirror modifier status
+            if not item.has_mirror_modifier and is_disabling:
+                # Objects without mirror modifiers get an error icon only when disabling
+                icon_type = 'ERROR'
+            elif context.active_object and item.name == context.active_object.name:
+                # Active object
+                icon_type = 'OBJECT_HIDDEN'
+            else:
+                # Other objects
+                icon_type = 'OBJECT_DATA'
+            
+            # Show object name
+            row.label(text=item.name, icon=icon_type)
+            
+            # Add tag for new/edit status
+            if item.has_mirror_modifier:
+                row.label(text="[Edit]")
+            elif not is_disabling:
+                # Will create new modifier when enabling
+                row.label(text="[New]")
+            # No tag when disabling and no modifier exists
+        elif self.layout_type in {'GRID'}:
+            layout.alignment = 'CENTER'
+            layout.label(text="", icon='OBJECT_DATA')
 
 
 class ROTOR_OT_SetMirrorAxis(bpy.types.Operator):
@@ -20,7 +78,103 @@ class ROTOR_OT_SetMirrorAxis(bpy.types.Operator):
         description="Sign (+ or -)",
         items=[('POS', '+', ''), ('NEG', '-', '')],
     )
+    
+    affected_objects: CollectionProperty(type=ROTOR_PG_MirrorObjectItem)
+    active_object_index: IntProperty(name="Active Object", default=0)
+    is_disabling: BoolProperty(name="Is Disabling", default=False)
 
+    def invoke(self, context, event):
+        """Populate the list when operator is invoked"""
+        # Clear and populate the list with current selection
+        self.affected_objects.clear()
+        active_object = context.active_object
+        objects_without_modifiers = 0
+        
+        # Check if we're enabling or disabling based on active object
+        axis_idx = {'X': 0, 'Y': 1, 'Z': 2}[self.axis]
+        is_neg = self.sign == 'NEG'
+        is_disabling = False
+        
+        if active_object and active_object.type == 'MESH':
+            active_mirror_mod = next((m for m in reversed(active_object.modifiers) if m.type == 'MIRROR'), None)
+            if active_mirror_mod:
+                # Check if we're trying to disable the axis
+                current_state = (active_mirror_mod.use_axis[axis_idx], 
+                               active_mirror_mod.use_bisect_flip_axis[axis_idx], 
+                               is_neg)
+                transitions = {
+                    (False, False, False): (True, False),
+                    (False, False, True):  (True, True),
+                    (True, False, False):  (False, False),  # Disabling
+                    (True, False, True):   (True, True),
+                    (True, True, False):   (True, False),
+                    (True, True, True):    (False, False),  # Disabling
+                }
+                new_axis, _ = transitions[current_state]
+                is_disabling = (active_mirror_mod.use_axis[axis_idx] and not new_axis)
+        
+        # Add active object first if it's a mesh
+        if active_object and active_object.type == 'MESH' and active_object.select_get():
+            item = self.affected_objects.add()
+            item.name = active_object.name
+            item.enabled = True
+            # Check if it has a mirror modifier
+            has_mirror = any(m.type == 'MIRROR' for m in active_object.modifiers)
+            item.has_mirror_modifier = has_mirror
+            if not has_mirror:
+                objects_without_modifiers += 1
+        
+        # Add other selected objects
+        for obj in context.selected_objects:
+            if obj.type == 'MESH' and obj != active_object:
+                item = self.affected_objects.add()
+                item.name = obj.name
+                item.enabled = True
+                # Check if it has a mirror modifier
+                has_mirror = any(m.type == 'MIRROR' for m in obj.modifiers)
+                item.has_mirror_modifier = has_mirror
+                if not has_mirror:
+                    objects_without_modifiers += 1
+        
+        # Store is_disabling state for use in draw methods
+        self.is_disabling = is_disabling
+        
+        # Only show warning if we're disabling and objects don't have modifiers
+        if is_disabling and objects_without_modifiers > 0:
+            self.report({'WARNING'}, f"Cannot disable mirror on {objects_without_modifiers} objects without mirror modifiers.")
+        
+        # Continue with normal execution
+        return self.execute(context)
+    
+    def draw(self, context):
+        """Draw checkboxes in the undo panel"""
+        layout = self.layout
+        
+        if hasattr(self, 'affected_objects') and self.affected_objects:
+            # Use the stored is_disabling state
+            is_disabling = self.is_disabling
+            
+            # Count objects with and without modifiers
+            objects_with_modifiers = sum(1 for item in self.affected_objects if item.has_mirror_modifier)
+            objects_without_modifiers = len(self.affected_objects) - objects_with_modifiers
+            
+            # Show object count
+            if is_disabling and objects_without_modifiers > 0:
+                layout.label(text=f"Affected Objects: {objects_with_modifiers} (Cannot disable on {objects_without_modifiers} without modifiers)", icon='ERROR')
+            elif not is_disabling and objects_without_modifiers > 0:
+                layout.label(text=f"Affected Objects: {len(self.affected_objects)} ({objects_without_modifiers} will get new modifiers)")
+            else:
+                layout.label(text=f"Affected Objects: {len(self.affected_objects)}")
+            
+            # Use template_list for scrollable list
+            layout.template_list(
+                "ROTOR_UL_MirrorObjectList", "",
+                self, "affected_objects",
+                self, "active_object_index",
+                rows=min(len(self.affected_objects), 10),  # Show up to 10 rows
+                maxrows=10
+            )
+    
     def execute(self, context):
         axis_map = {'X': 0, 'Y': 1, 'Z': 2}
         axis_idx = axis_map[self.axis]
@@ -30,6 +184,10 @@ class ROTOR_OT_SetMirrorAxis(bpy.types.Operator):
         pref = addon.pref().tools.mirror
         pivot = pref.pivot
         orientation = pref.orientation
+        
+        # Track results
+        affected_count = 0
+        skipped_count = 0
 
 
         def toggle_axis(use_axis, use_bisect_flip, use_bisect, axis_idx, is_neg):
@@ -71,24 +229,60 @@ class ROTOR_OT_SetMirrorAxis(bpy.types.Operator):
             use_bisect_flip[axis_idx] = new_bisect_flip
             use_bisect[axis_idx] = True
 
-        mirror_object = None
-        individual = False
+        # First check active object to determine if we're enabling or disabling
+        active_mirror_mod = next((m for m in reversed(active_object.modifiers) if m.type == 'MIRROR'), None)
+        is_disabling = False
+        
+        if active_mirror_mod:
+            # Check if we're trying to disable the axis
+            current_state = (active_mirror_mod.use_axis[axis_idx], 
+                           active_mirror_mod.use_bisect_flip_axis[axis_idx], 
+                           is_neg)
+            # Check transition table to see if we're disabling
+            transitions = {
+                (False, False, False): (True, False),
+                (False, False, True):  (True, True),
+                (True, False, False):  (False, False),  # Disabling
+                (True, False, True):   (True, True),
+                (True, True, False):   (True, False),
+                (True, True, True):    (False, False),  # Disabling
+            }
+            new_axis, _ = transitions[current_state]
+            is_disabling = (active_mirror_mod.use_axis[axis_idx] and not new_axis)
+        
+        # Always calculate mirror object based on current settings
+        # This ensures newly created modifiers use the correct pivot/orientation
+        mirror_object, individual = _get_mirror_object(context, active_object, pivot, orientation)
 
-        mirror_mod = next((m for m in reversed(active_object.modifiers) if m.type == 'MIRROR'), None)
-        if mirror_mod is None:
-            mirror_object, individual = _get_mirror_object(context, active_object, pivot, orientation)
-
-        for obj in context.selected_objects:
-            if obj.type != 'MESH':
-                continue
-            # Find existing mirror modifier, or create one
+        # Get list of enabled objects
+        enabled_objects = []
+        if hasattr(self, 'affected_objects') and self.affected_objects:
+            for item in self.affected_objects:
+                if item.enabled and item.name in bpy.data.objects:
+                    obj = bpy.data.objects[item.name]
+                    if obj.type == 'MESH':
+                        enabled_objects.append(obj)
+        else:
+            # First run - use all selected mesh objects
+            enabled_objects = [obj for obj in context.selected_objects if obj.type == 'MESH']
+        
+        for obj in enabled_objects:
+            # Find existing mirror modifier
             mirror_mod = next((m for m in reversed(obj.modifiers) if m.type == 'MIRROR'), None)
+            
             if mirror_mod is None:
-                if pref.bisect:
-                    _bisect_object(obj, axis_idx, pivot, orientation, context)
-
-                _create_mirror_modifier(context, obj, mirror_object, individual, axis_idx, is_neg)
-                continue
+                if is_disabling:
+                    # Can't disable on objects without modifiers
+                    skipped_count += 1
+                    continue
+                else:
+                    # Enabling - create the modifier
+                    if pref.bisect:
+                        _bisect_object(obj, axis_idx, pivot, orientation, context)
+                    
+                    _create_mirror_modifier(context, obj, mirror_object, individual, axis_idx, is_neg)
+                    affected_count += 1
+                    continue
 
             # Set up axis and bisect options
             use_axis = mirror_mod.use_axis
@@ -96,7 +290,20 @@ class ROTOR_OT_SetMirrorAxis(bpy.types.Operator):
             use_bisect = mirror_mod.use_bisect_axis
 
             toggle_axis(use_axis, use_bisect_flip, use_bisect, axis_idx, is_neg)
+            affected_count += 1
 
+        # Report results
+        if is_disabling:
+            if skipped_count > 0 and affected_count > 0:
+                self.report({'WARNING'}, f"Disabled mirror on {affected_count} objects. Could not disable on {skipped_count} objects without mirror modifiers.")
+            elif skipped_count > 0 and affected_count == 0:
+                self.report({'ERROR'}, f"Could not disable mirror. {skipped_count} objects have no mirror modifiers.")
+                return {'CANCELLED'}
+            else:
+                self.report({'INFO'}, f"Disabled mirror on {affected_count} objects.")
+        else:
+            # Enabling - we create modifiers if needed
+            self.report({'INFO'}, f"Modified {affected_count} objects.")
 
         return {'FINISHED'}
 
@@ -117,6 +324,52 @@ class ROTOR_OT_AddMirrorAxis(bpy.types.Operator):
         description="Sign (+ or -)",
         items=[('POS', '+', ''), ('NEG', '-', '')],
     )
+    
+    affected_objects: CollectionProperty(type=ROTOR_PG_MirrorObjectItem)
+    active_object_index: IntProperty(name="Active Object", default=0)
+
+    def invoke(self, context, event):
+        """Populate the list when operator is invoked"""
+        # Clear and populate the list with current selection
+        self.affected_objects.clear()
+        active_object = context.active_object
+        
+        # Add active object first if it's a mesh
+        if active_object and active_object.type == 'MESH' and active_object.select_get():
+            item = self.affected_objects.add()
+            item.name = active_object.name
+            item.enabled = True
+            # For Add operation, we will add modifiers so mark as having them
+            item.has_mirror_modifier = True
+        
+        # Add other selected objects
+        for obj in context.selected_objects:
+            if obj.type == 'MESH' and obj != active_object:
+                item = self.affected_objects.add()
+                item.name = obj.name
+                item.enabled = True
+                # For Add operation, we will add modifiers so mark as having them
+                item.has_mirror_modifier = True
+        
+        # Continue with normal execution
+        return self.execute(context)
+
+    def draw(self, context):
+        """Draw checkboxes in the undo panel"""
+        layout = self.layout
+        
+        if hasattr(self, 'affected_objects') and self.affected_objects:
+            # Show object count
+            layout.label(text=f"Affected Objects: {len(self.affected_objects)}")
+            
+            # Use template_list for scrollable list
+            layout.template_list(
+                "ROTOR_UL_MirrorObjectList", "",
+                self, "affected_objects",
+                self, "active_object_index",
+                rows=min(len(self.affected_objects), 10),  # Show up to 10 rows
+                maxrows=10
+            )
 
     def execute(self, context):
         axis_map = {'X': 0, 'Y': 1, 'Z': 2}
@@ -130,9 +383,19 @@ class ROTOR_OT_AddMirrorAxis(bpy.types.Operator):
 
         mirror_object, individual = _get_mirror_object(context, active_object, pivot, orientation)
 
-        for obj in context.selected_objects:
-            if obj.type != 'MESH':
-                continue
+        # Get list of enabled objects
+        enabled_objects = []
+        if hasattr(self, 'affected_objects') and self.affected_objects:
+            for item in self.affected_objects:
+                if item.enabled and item.name in bpy.data.objects:
+                    obj = bpy.data.objects[item.name]
+                    if obj.type == 'MESH':
+                        enabled_objects.append(obj)
+        else:
+            # First run - use all selected mesh objects
+            enabled_objects = [obj for obj in context.selected_objects if obj.type == 'MESH']
+        
+        for obj in enabled_objects:
 
 
             if pref.bisect:
@@ -158,6 +421,39 @@ class ROTOR_OT_AddMirrorCollection(bpy.types.Operator):
         description="Sign (+ or -)",
         items=[('POS', '+', ''), ('NEG', '-', '')],
     )
+    
+    affected_collections: CollectionProperty(type=ROTOR_PG_MirrorCollectionItem)
+
+    def invoke(self, context, event):
+        """Populate the list when operator is invoked"""
+        # Clear and populate the list with current selection
+        self.affected_collections.clear()
+        selected_objs = context.selected_objects
+        collections = set()
+        for obj in selected_objs:
+            for col in getattr(obj, 'users_collection', []):
+                # Ignore master collection and hidden/internal ones
+                if not col.library and col.name != 'Scene Collection':
+                    collections.add(col)
+        
+        for col in collections:
+            item = self.affected_collections.add()
+            item.name = col.name
+            item.enabled = True
+        
+        # Continue with normal execution
+        return self.execute(context)
+
+    def draw(self, context):
+        """Draw checkboxes in the undo panel"""
+        layout = self.layout
+        
+        if hasattr(self, 'affected_collections') and self.affected_collections:
+            layout.label(text=f"Affected Collections: {len(self.affected_collections)}")
+            # For collections, we'll keep the simple list approach since there's no UIList for collections
+            for item in self.affected_collections:
+                row = layout.row()
+                row.prop(item, "enabled", text=item.name)
 
     def execute(self, context):
         axis_map = {'X': 0, 'Y': 1, 'Z': 2}
@@ -168,19 +464,28 @@ class ROTOR_OT_AddMirrorCollection(bpy.types.Operator):
         pref = addon.pref().tools.mirror
         pivot = pref.pivot
         orientation = pref.orientation
-
-        # Gather all unique collections from selected objects
-        selected_objs = context.selected_objects
-        collections = set()
-        for obj in selected_objs:
-            for col in getattr(obj, 'users_collection', []):
-                # Ignore master collection and hidden/internal ones
-                if not col.library and col.name != 'Scene Collection':
-                    collections.add(col)
+        
+        # Get enabled collections
+        enabled_collections = []
+        if hasattr(self, 'affected_collections') and self.affected_collections:
+            for item in self.affected_collections:
+                if item.enabled and item.name in bpy.data.collections:
+                    col = bpy.data.collections[item.name]
+                    enabled_collections.append(col)
+        else:
+            # First run - get all collections from selected objects
+            selected_objs = context.selected_objects
+            collections = set()
+            for obj in selected_objs:
+                for col in getattr(obj, 'users_collection', []):
+                    # Ignore master collection and hidden/internal ones
+                    if not col.library and col.name != 'Scene Collection':
+                        collections.add(col)
+            enabled_collections = list(collections)
 
         # Avoid double instancing
         created = set()
-        for col in collections:
+        for col in enabled_collections:
             if col in created:
                 continue
             created.add(col)
@@ -403,7 +708,13 @@ def _bisect_object(obj, axis_idx, pivot, orientation, context):
     obj.data.update()
 
 
+types_classes = (
+    ROTOR_PG_MirrorObjectItem,
+    ROTOR_PG_MirrorCollectionItem,
+)
+
 classes = (
+    ROTOR_UL_MirrorObjectList,
     ROTOR_OT_SetMirrorAxis,
     ROTOR_OT_AddMirrorAxis,
     ROTOR_OT_AddMirrorCollection,
