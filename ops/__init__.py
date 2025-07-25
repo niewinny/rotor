@@ -8,6 +8,10 @@ class Theme(bpy.types.PropertyGroup):
 
 class Scene(bpy.types.PropertyGroup):
     test: bpy.props.BoolProperty(default=False)
+    last_tool: bpy.props.StringProperty(
+        name="Last Tool",
+        description="Last active tool before mirror tool",
+        default="")
 
 
 types_classes = (

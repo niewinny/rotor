@@ -47,6 +47,8 @@ class ROTOR_MT_Mirror(bpy.types.WorkSpaceTool):
         row.separator()
 
         row.prop(rotor, 'bisect', text="Bisect")
+        row.separator()
+        row.prop(rotor, 'tool_fallback', text="Tool Fallback")
 
         row.separator_spacer()
 
@@ -166,6 +168,20 @@ class Mirror(bpy.types.PropertyGroup):
         name="Bisect",
         description="Bisect the object using specified axis",
         default=False)
+    
+    tool_fallback: bpy.props.BoolProperty(
+        name="Tool Fallback",
+        description="Return to previous tool after mirror operation",
+        default=False)
+    
+    gizmo_size: bpy.props.FloatProperty(
+        name="Gizmo Size",
+        description="Size of the mirror gizmo handles",
+        default=1.0,
+        min=0.1,
+        max=5.0,
+        soft_min=0.5,
+        soft_max=2.0)
 
 types_classes = (
     Mirror,

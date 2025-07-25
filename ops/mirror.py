@@ -270,6 +270,21 @@ class ROTOR_OT_SetMirrorAxis(bpy.types.Operator):
             # Enabling - we create modifiers if needed
             self.report({'INFO'}, f"Modified {affected_count} objects.")
 
+        # Check if we should return to previous tool
+        pref = addon.pref().tools.mirror
+        last_tool = context.scene.rotor.ops.last_tool
+        if pref.tool_fallback and last_tool:
+            # Check if we're currently using the mirror tool
+            current_tool = context.workspace.tools.from_space_view3d_mode(context.mode, create=False)
+            if current_tool and current_tool.idname == 'rotor.mirror_tool':
+                try:
+                    bpy.ops.wm.tool_set_by_id(name=last_tool)
+                    # Clear the last tool to prevent stale references
+                    context.scene.rotor.ops.last_tool = ""
+                except:
+                    # If switching fails, just continue
+                    pass
+
         return {'FINISHED'}
 
 
@@ -371,6 +386,56 @@ class ROTOR_OT_AddMirrorAxis(bpy.types.Operator):
         # Report success
         self.report({'INFO'}, f"Added mirror modifiers to {affected_count} objects.")
         
+        # Check if we should return to previous tool
+        pref = addon.pref().tools.mirror
+        last_tool = context.scene.rotor.ops.last_tool
+        if pref.tool_fallback and last_tool:
+            # Check if we're currently using the mirror tool
+            current_tool = context.workspace.tools.from_space_view3d_mode(context.mode, create=False)
+            if current_tool and current_tool.idname == 'rotor.mirror_tool':
+                try:
+                    bpy.ops.wm.tool_set_by_id(name=last_tool)
+                    # Clear the last tool to prevent stale references
+                    context.scene.rotor.ops.last_tool = ""
+                except:
+                    # If switching fails, just continue
+                    pass
+        
+        return {'FINISHED'}
+
+
+class ROTOR_OT_FallbackTool(bpy.types.Operator):
+    """Return to previous tool"""
+    bl_idname = "rotor.fallback_tool"
+    bl_label = "Return to Previous Tool"
+    bl_options = {'REGISTER'}
+    
+    @classmethod
+    def poll(cls, context):
+        # Only available when mirror tool is active
+        current_tool = context.workspace.tools.from_space_view3d_mode(context.mode, create=False)
+        return current_tool and current_tool.idname == 'rotor.mirror_tool'
+
+    def execute(self, context):
+        # Get the last tool from scene properties
+        last_tool = context.scene.rotor.ops.last_tool
+        
+        if last_tool:
+            # Check if we're currently using the mirror tool
+            current_tool = context.workspace.tools.from_space_view3d_mode(context.mode, create=False)
+            if current_tool and current_tool.idname == 'rotor.mirror_tool':
+                try:
+                    bpy.ops.wm.tool_set_by_id(name=last_tool)
+                    # Clear the last tool to prevent stale references
+                    context.scene.rotor.ops.last_tool = ""
+                    self.report({'INFO'}, f"Switched to {last_tool}")
+                except:
+                    self.report({'WARNING'}, "Failed to switch to previous tool")
+            else:
+                self.report({'INFO'}, "Not using mirror tool")
+        else:
+            self.report({'INFO'}, "No previous tool stored")
+            
         return {'FINISHED'}
 
 
@@ -535,6 +600,21 @@ class ROTOR_OT_AddMirrorCollection(bpy.types.Operator):
             self.report({'INFO'}, f"Mirrored {len(created)} collections.")
         else:
             self.report({'WARNING'}, "No collections were mirrored.")
+        
+        # Check if we should return to previous tool
+        pref = addon.pref().tools.mirror
+        last_tool = context.scene.rotor.ops.last_tool
+        if pref.tool_fallback and last_tool:
+            # Check if we're currently using the mirror tool
+            current_tool = context.workspace.tools.from_space_view3d_mode(context.mode, create=False)
+            if current_tool and current_tool.idname == 'rotor.mirror_tool':
+                try:
+                    bpy.ops.wm.tool_set_by_id(name=last_tool)
+                    # Clear the last tool to prevent stale references
+                    context.scene.rotor.ops.last_tool = ""
+                except:
+                    # If switching fails, just continue
+                    pass
             
         return {'FINISHED'}
 
@@ -691,5 +771,6 @@ classes = (
     ROTOR_UL_MirrorObjectList,
     ROTOR_OT_SetMirrorAxis,
     ROTOR_OT_AddMirrorAxis,
+    ROTOR_OT_FallbackTool,
     ROTOR_OT_AddMirrorCollection,
 )

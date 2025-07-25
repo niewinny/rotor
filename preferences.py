@@ -30,10 +30,23 @@ class Rotor_Preference(bpy.types.AddonPreferences):
 
         if self.settings == 'OPTIONS':
             col = col.column(align=True)
+            mirror = self.tools.mirror
+            col.prop(mirror, 'gizmo_size')
 
         elif self.settings == 'THEME':
             flow = col.grid_flow(row_major=False, columns=0, even_columns=True, even_rows=False, align=False)
             theme = context.preferences.addons[base_package].preferences.theme
+            
+            # Display axis colors
+            axis_box = flow.box()
+            axis_box.label(text="Axis Colors", icon='ORIENTATION_GLOBAL')
+            axis_col = axis_box.column(align=True)
+            axis_col.prop(theme.axis, 'x')
+            axis_col.prop(theme.axis, 'y')
+            axis_col.prop(theme.axis, 'z')
+            axis_col.separator()
+            axis_col.prop(theme.axis, 'g')
+            axis_col.prop(theme.axis, 'n')
 
 
     def theme_layout(self, layout, theme):
