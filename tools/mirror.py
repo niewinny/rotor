@@ -31,6 +31,9 @@ class ROTOR_MT_Mirror(bpy.types.WorkSpaceTool):
     bl_description = 'Tool for mirroring geometry'
     bl_widget = 'ROTOR_GGT_MirrorGizmoGroup'
     bl_icon = (Path(__file__).parent.parent / "icons" / "mirror").as_posix()
+    bl_keymap = (
+        ("rotor.fallback_tool", {"type": 'ESC', "value": 'PRESS'}, None),
+    )
 
 
     def draw_settings(context, layout, tool):

@@ -10,11 +10,6 @@ def object_mode_hotkeys(kc):
     # menu hotkey 
     kmi = km.keymap_items.new('rotor.set_active_tool', 'X', 'PRESS',  alt=True)
     keys.append((km, kmi))
-    
-    # ESC to return to previous tool when mirror tool is active
-    kmi = km.keymap_items.new('rotor.fallback_tool', 'ESC', 'PRESS')
-    kmi.active = True
-    keys.append((km, kmi))
 
 def register():
     '''Register Keymaps'''
