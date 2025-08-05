@@ -1,6 +1,12 @@
 import bpy
-from . import mirror
-from . import set_tool
+from . import (
+    mirror_props,
+    mirror_set_axis,
+    mirror_add_axis,
+    mirror_add_collection,
+    mirror_fallback_tool,
+    set_tool
+)
 
 
 class Theme(bpy.types.PropertyGroup):
@@ -17,11 +23,15 @@ class Scene(bpy.types.PropertyGroup):
 types_classes = (
     Scene,
     Theme,
-    *mirror.types_classes,
+    *mirror_props.types_classes,
 )
 
 
 classes = (
-    *mirror.classes,
+    *mirror_props.classes,
+    *mirror_set_axis.classes,
+    *mirror_add_axis.classes,
+    *mirror_add_collection.classes,
+    *mirror_fallback_tool.classes,
     *set_tool.classes,
 )

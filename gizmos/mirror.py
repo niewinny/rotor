@@ -110,10 +110,10 @@ class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
             active_mesh = selected_meshes[0] if selected_meshes else None
 
         if active_mesh:
-            # Find last mirror modifier
+            # Find pinned mirror modifier only (no fallback for set arrows)
             mirror_mod = None
-            for mod in reversed(active_mesh.modifiers):
-                if mod.type == 'MIRROR':
+            for mod in active_mesh.modifiers:
+                if mod.type == 'MIRROR' and mod.use_pin_to_last:
                     mirror_mod = mod
                     break
             if mirror_mod:
