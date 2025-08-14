@@ -42,8 +42,8 @@ class ROTOR_OT_SetMirrorAxis(bpy.types.Operator):
         is_disabling = False
         
         if active_object and active_object.type == 'MESH':
-            # Find pinned mirror modifier first, then fall back to last modifier
-            active_mirror_mod = next((m for m in active_object.modifiers if m.type == 'MIRROR' and m.use_pin_to_last), None)
+            # Find last pinned mirror modifier first, then fall back to last modifier
+            active_mirror_mod = next((m for m in reversed(active_object.modifiers) if m.type == 'MIRROR' and m.use_pin_to_last), None)
             if not active_mirror_mod:
                 active_mirror_mod = next((m for m in reversed(active_object.modifiers) if m.type == 'MIRROR'), None)
             if active_mirror_mod:
@@ -131,8 +131,8 @@ class ROTOR_OT_SetMirrorAxis(bpy.types.Operator):
         skipped_count = 0
 
         # First check active object to determine if we're enabling or disabling
-        # Find pinned mirror modifier first, then fall back to last modifier
-        active_mirror_mod = next((m for m in active_object.modifiers if m.type == 'MIRROR' and m.use_pin_to_last), None)
+        # Find last pinned mirror modifier first, then fall back to last modifier
+        active_mirror_mod = next((m for m in reversed(active_object.modifiers) if m.type == 'MIRROR' and m.use_pin_to_last), None)
         if not active_mirror_mod:
             active_mirror_mod = next((m for m in reversed(active_object.modifiers) if m.type == 'MIRROR'), None)
         is_disabling = False
@@ -162,8 +162,8 @@ class ROTOR_OT_SetMirrorAxis(bpy.types.Operator):
             enabled_objects = [obj for obj in context.selected_objects if obj.type == 'MESH']
         
         for obj in enabled_objects:
-            # Find pinned mirror modifier first
-            mirror_mod = next((m for m in obj.modifiers if m.type == 'MIRROR' and m.use_pin_to_last), None)
+            # Find last pinned mirror modifier
+            mirror_mod = next((m for m in reversed(obj.modifiers) if m.type == 'MIRROR' and m.use_pin_to_last), None)
             
             if mirror_mod is None:
                 if is_disabling:
