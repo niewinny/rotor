@@ -175,7 +175,7 @@ class Mirror(bpy.types.PropertyGroup):
     tool_fallback: bpy.props.BoolProperty(
         name="Tool Fallback",
         description="Return to previous tool after mirror operation",
-        default=False)
+        default=True)
     
     gizmo_size: bpy.props.FloatProperty(
         name="Gizmo Size",
