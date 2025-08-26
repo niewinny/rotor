@@ -42,13 +42,12 @@ class ROTOR_OT_SetMirrorAxis(bpy.types.Operator):
         is_disabling = False
         
         # Only check active object if it's selected
+        # Only check PINNED modifiers since set operation only affects pinned modifiers
         if active_object and active_object.type == 'MESH' and active_object.select_get():
-            # Find last pinned mirror modifier first, then fall back to last modifier
+            # Only look for pinned mirror modifiers for set operations
             active_mirror_mod = next((m for m in reversed(active_object.modifiers) if m.type == 'MIRROR' and m.use_pin_to_last), None)
-            if not active_mirror_mod:
-                active_mirror_mod = next((m for m in reversed(active_object.modifiers) if m.type == 'MIRROR'), None)
             if active_mirror_mod:
-                # Check if we're trying to disable the axis
+                # Check if we're trying to disable the axis on the pinned modifier
                 current_state = (active_mirror_mod.use_axis[axis_idx], 
                                active_mirror_mod.use_bisect_flip_axis[axis_idx], 
                                is_neg)
@@ -136,16 +135,14 @@ class ROTOR_OT_SetMirrorAxis(bpy.types.Operator):
         skipped_count = 0
 
         # First check active object to determine if we're enabling or disabling
-        # Only check if active object is selected
+        # Only check PINNED modifiers since set operation only affects pinned modifiers
         is_disabling = False
         if active_object and active_object.select_get():
-            # Find last pinned mirror modifier first, then fall back to last modifier
+            # Only look for pinned mirror modifiers for set operations
             active_mirror_mod = next((m for m in reversed(active_object.modifiers) if m.type == 'MIRROR' and m.use_pin_to_last), None)
-            if not active_mirror_mod:
-                active_mirror_mod = next((m for m in reversed(active_object.modifiers) if m.type == 'MIRROR'), None)
             
             if active_mirror_mod:
-                # Check if we're trying to disable the axis
+                # Check if we're trying to disable the axis on the pinned modifier
                 current_state = (active_mirror_mod.use_axis[axis_idx], 
                                active_mirror_mod.use_bisect_flip_axis[axis_idx], 
                                is_neg)
@@ -169,36 +166,36 @@ class ROTOR_OT_SetMirrorAxis(bpy.types.Operator):
             enabled_objects = [obj for obj in context.selected_objects if obj.type == 'MESH']
         
         for obj in enabled_objects:
-            # Find last pinned mirror modifier
+            # ONLY work with pinned mirror modifiers for set operation
             mirror_mod = next((m for m in reversed(obj.modifiers) if m.type == 'MIRROR' and m.use_pin_to_last), None)
             
             if mirror_mod is None:
                 if is_disabling:
-                    # Can't disable on objects without modifiers
+                    # No pinned modifier to disable - skip this object
                     skipped_count += 1
                     continue
                 else:
-                    # Enabling - create the modifier
+                    # Enabling - create a new pinned modifier
                     if pref.bisect:
                         bisect_object(obj, axis_idx, pivot, orientation, context)
                     
                     create_mirror_modifier(context, obj, mirror_object, individual, axis_idx, is_neg)
-                    # For set operation, pin the newly created modifier
+                    # Pin the newly created modifier for set operations
                     new_mod = next((m for m in reversed(obj.modifiers) if m.type == 'MIRROR'), None)
                     if new_mod:
                         new_mod.use_pin_to_last = True
                     affected_count += 1
                     continue
 
-            # Set up axis and bisect options
+            # We have a pinned modifier - modify it
             use_axis = mirror_mod.use_axis
             use_bisect_flip = mirror_mod.use_bisect_flip_axis
             use_bisect = mirror_mod.use_bisect_axis
 
             toggle_axis(use_axis, use_bisect_flip, use_bisect, axis_idx, is_neg)
             
-            # Check if all axes are disabled and modifier is pinned - if so, remove it
-            if mirror_mod.use_pin_to_last and not any(use_axis):
+            # If all axes are disabled, remove the pinned modifier
+            if not any(use_axis):
                 obj.modifiers.remove(mirror_mod)
                 
             affected_count += 1
@@ -206,15 +203,15 @@ class ROTOR_OT_SetMirrorAxis(bpy.types.Operator):
         # Report results
         if is_disabling:
             if skipped_count > 0 and affected_count > 0:
-                self.report({'WARNING'}, f"Disabled mirror on {affected_count} objects. Could not disable on {skipped_count} objects without mirror modifiers.")
+                self.report({'WARNING'}, f"Disabled mirror on {affected_count} objects. Skipped {skipped_count} objects without pinned mirror modifiers.")
             elif skipped_count > 0 and affected_count == 0:
-                self.report({'ERROR'}, f"Could not disable mirror. {skipped_count} objects have no mirror modifiers.")
+                self.report({'ERROR'}, f"Could not disable mirror. {skipped_count} objects have no pinned mirror modifiers.")
                 return {'CANCELLED'}
             else:
                 self.report({'INFO'}, f"Disabled mirror on {affected_count} objects.")
         else:
             # Enabling - we create modifiers if needed
-            self.report({'INFO'}, f"Modified {affected_count} objects.")
+            self.report({'INFO'}, f"Set mirror on {affected_count} objects.")
 
         # Check if we should return to previous tool
         pref = addon.pref().tools.mirror
