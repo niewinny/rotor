@@ -9,7 +9,7 @@ from .mirror_props import ROTOR_PG_MirrorObjectItem
 
 
 class ROTOR_OT_SetMirrorAxis(bpy.types.Operator):
-    """Set mirror axis"""
+    """Mirror axis"""
     bl_idname = "rotor.set_mirror_axis"
     bl_label = "Rotor Mirror Axis"
     bl_options = {'REGISTER', 'UNDO'}

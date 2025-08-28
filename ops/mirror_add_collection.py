@@ -7,6 +7,7 @@ from .mirror_props import ROTOR_PG_MirrorCollectionItem
 
 
 class ROTOR_OT_AddMirrorCollection(bpy.types.Operator):
+    """Collection mirror"""
     bl_idname = "rotor.add_mirror_collection"
     bl_label = "Rotor Mirror Axis"
     bl_options = {'REGISTER', 'UNDO'}
