@@ -95,7 +95,7 @@ class ROTOR_OT_AddMirrorAxis(bpy.types.Operator):
         affected_count = 0
         for obj in enabled_objects:
             if pref.bisect:
-                bisect_object(obj, axis_idx, pivot, orientation, context)
+                bisect_object(obj, axis_idx, pivot, orientation, context, is_neg)
 
             create_mirror_modifier(context, obj, mirror_object, individual, axis_idx, is_neg)
             affected_count += 1

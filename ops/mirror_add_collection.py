@@ -94,7 +94,7 @@ class ROTOR_OT_AddMirrorCollection(bpy.types.Operator):
             if pref.bisect:
                 mesh_objects = [obj for obj in col.objects if obj.type == 'MESH']
                 for obj in mesh_objects:
-                    bisect_object(obj, axis_idx, pivot, orientation, context)
+                    bisect_object(obj, axis_idx, pivot, orientation, context, is_neg)
 
             # Create an empty to instance the collection
             empty = bpy.data.objects.new(f"RotorMirrorInstance_{col.name}", None)

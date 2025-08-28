@@ -177,7 +177,7 @@ class ROTOR_OT_SetMirrorAxis(bpy.types.Operator):
                 else:
                     # Enabling - create a new pinned modifier
                     if pref.bisect:
-                        bisect_object(obj, axis_idx, pivot, orientation, context)
+                        bisect_object(obj, axis_idx, pivot, orientation, context, is_neg)
                     
                     create_mirror_modifier(context, obj, mirror_object, individual, axis_idx, is_neg)
                     # Pin the newly created modifier for set operations

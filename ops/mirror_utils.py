@@ -92,7 +92,7 @@ def create_empty_mirror_object(context, location, orientation=(0.0, 0.0, 0.0)):
     return empty
 
 
-def bisect_object(obj, axis_idx, pivot, orientation, context):
+def bisect_object(obj, axis_idx, pivot, orientation, context, is_neg=False):
     """Bisect a single object using bmesh.ops.bisect_plane without changing modes"""
 
     if obj.type != 'MESH':
@@ -100,7 +100,7 @@ def bisect_object(obj, axis_idx, pivot, orientation, context):
 
     # Get the bisect plane normal vector
     normal = Vector((0, 0, 0))
-    normal[axis_idx] = 1.0
+    normal[axis_idx] = -1.0 if is_neg else 1.0
 
     # Get the pivot point
     if pivot == 'WORLD':
