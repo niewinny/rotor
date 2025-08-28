@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 bl_info = {
     'name': "rotor",
     'description': "AI agent for Blender",
-    'author': "ChonkyCat.io",
+    'author': "ezelar.com",
     'version': (0, 0, 1),
     'blender': (4, 0, 0),
     'location': 'View3D',
