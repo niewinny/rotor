@@ -28,7 +28,7 @@ def register():
     # Register with appropriate settings
     if has_blockout:
         # Place under Blockout without separator
-        register_tool(tools.mirror.ROTOR_MT_Mirror, group=False, separator=False, after={'bout.block_obj'})
+        register_tool(tools.mirror.ROTOR_MT_Mirror, group=False, separator=False, after={'object.bout_block_obj'})
     else:
         # Default: use separator
         register_tool(tools.mirror.ROTOR_MT_Mirror, group=False, separator=True)
