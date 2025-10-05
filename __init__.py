@@ -19,7 +19,7 @@ bl_info = {
     'name': "rotor",
     'description': "Mirroring objects easily with a gizmo",
     'author': "ezelar.com",
-    'version': (1, 1, 0),
+    'version': (1, 1, 1),
     'blender': (4, 0, 0),
     'location': 'View3D',
     'wiki_url': '',
