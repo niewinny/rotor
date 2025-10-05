@@ -17,9 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 bl_info = {
     'name': "rotor",
-    'description': "AI agent for Blender",
+    'description': "Mirroring objects easily with a gizmo",
     'author': "ezelar.com",
-    'version': (0, 0, 1),
+    'version': (1, 1, 0),
     'blender': (4, 0, 0),
     'location': 'View3D',
     'wiki_url': '',
