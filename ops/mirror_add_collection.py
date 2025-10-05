@@ -10,7 +10,7 @@ class ROTOR_OT_AddMirrorCollection(bpy.types.Operator):
     """Mirror collection"""
     bl_idname = "rotor.add_mirror_collection"
     bl_label = "Rotor Mirror Axis"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
 
     axis: bpy.props.EnumProperty(
         name="Axis",

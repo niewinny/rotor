@@ -5,7 +5,7 @@ class ROTOR_OT_FallbackTool(bpy.types.Operator):
     """Return to previous tool"""
     bl_idname = "rotor.fallback_tool"
     bl_label = "Return to Previous Tool"
-    bl_options = {'REGISTER'}
+    bl_options = {'REGISTER', 'INTERNAL'}
     
     @classmethod
     def poll(cls, context):

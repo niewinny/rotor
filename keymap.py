@@ -8,7 +8,7 @@ def object_mode_hotkeys(kc):
 
     km = kc.keymaps.new(name='Object Mode', space_type='EMPTY')
     # menu hotkey 
-    kmi = km.keymap_items.new('rotor.set_active_tool', 'X', 'PRESS',  alt=True)
+    kmi = km.keymap_items.new('object.rotor_set_active_tool', 'X', 'PRESS',  alt=True)
     keys.append((km, kmi))
 
 def register():

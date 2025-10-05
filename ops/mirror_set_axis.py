@@ -12,7 +12,7 @@ class ROTOR_OT_SetMirrorAxis(bpy.types.Operator):
     """Mirror axis"""
     bl_idname = "rotor.set_mirror_axis"
     bl_label = "Rotor Mirror Axis"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
 
     axis: bpy.props.EnumProperty(
         name="Axis",
