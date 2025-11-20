@@ -4,15 +4,16 @@ keys = []
 
 
 def object_mode_hotkeys(kc):
-    '''Object Mode Hotkeys'''
+    """Object Mode Hotkeys"""
 
-    km = kc.keymaps.new(name='Object Mode', space_type='EMPTY')
-    # menu hotkey 
-    kmi = km.keymap_items.new('object.rotor_set_active_tool', 'X', 'PRESS',  alt=True)
+    km = kc.keymaps.new(name="Object Mode", space_type="EMPTY")
+    # menu hotkey
+    kmi = km.keymap_items.new("object.rotor_set_active_tool", "X", "PRESS", alt=True)
     keys.append((km, kmi))
 
+
 def register():
-    '''Register Keymaps'''
+    """Register Keymaps"""
 
     wm = bpy.context.window_manager
     active_keyconfig = wm.keyconfigs.active
@@ -27,7 +28,7 @@ def register():
 
 
 def unregister():
-    '''Unregister Keymaps'''
+    """Unregister Keymaps"""
 
     for km, kmi in keys:
         km.keymap_items.remove(kmi)

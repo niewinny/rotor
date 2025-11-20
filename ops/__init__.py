@@ -5,19 +5,19 @@ from . import (
     mirror_add_axis,
     mirror_add_collection,
     mirror_fallback_tool,
-    set_tool
+    set_tool,
 )
 
 
 class Theme(bpy.types.PropertyGroup):
     test: bpy.props.BoolProperty(default=False)
 
+
 class Scene(bpy.types.PropertyGroup):
     test: bpy.props.BoolProperty(default=False)
     last_tool: bpy.props.StringProperty(
-        name="Last Tool",
-        description="Last active tool before mirror tool",
-        default="")
+        name="Last Tool", description="Last active tool before mirror tool", default=""
+    )
 
 
 types_classes = (

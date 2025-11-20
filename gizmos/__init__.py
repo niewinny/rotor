@@ -1,6 +1,4 @@
 from . import mirror
 
 
-classes = (
-    *mirror.classes,
-)
+classes = (*mirror.classes,)

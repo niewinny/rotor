@@ -19,16 +19,21 @@ def register():
         register_class(cls)
 
     has_blockout = False
-    
+
     addon_prefs = bpy.context.preferences.addons
     for addon_name in addon_prefs.keys():
-        if 'blockout' in addon_name.lower() or 'bout' in addon_name.lower():
+        if "blockout" in addon_name.lower() or "bout" in addon_name.lower():
             has_blockout = True
-    
+
     # Register with appropriate settings
     if has_blockout:
         # Place under Blockout without separator
-        register_tool(tools.mirror.ROTOR_MT_Mirror, group=False, separator=False, after={'object.bout_block_obj'})
+        register_tool(
+            tools.mirror.ROTOR_MT_Mirror,
+            group=False,
+            separator=False,
+            after={"object.bout_block_obj"},
+        )
     else:
         # Default: use separator
         register_tool(tools.mirror.ROTOR_MT_Mirror, group=False, separator=True)

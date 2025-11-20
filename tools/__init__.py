@@ -1,12 +1,7 @@
 from . import mirror
 
 
-
-types_classes = (
-    *mirror.types_classes,
-)
+types_classes = (*mirror.types_classes,)
 
 
-classes = (
-    *mirror.classes,
-)
+classes = (*mirror.classes,)

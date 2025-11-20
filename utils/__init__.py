@@ -1,1 +1,1 @@
-from . import addon
+from . import addon as addon
