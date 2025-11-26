@@ -29,6 +29,7 @@ class Rotor_Preference(bpy.types.AddonPreferences):
             col = col.column(align=True)
             mirror = self.tools.mirror
             col.prop(mirror, "gizmo_size")
+            col.prop(mirror, "reverse_controls")
 
         elif self.settings == "THEME":
             flow = col.grid_flow(

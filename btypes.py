@@ -4,7 +4,7 @@ from . import tools
 
 
 class Tools(bpy.types.PropertyGroup):
-    mirror: bpy.props.PointerProperty(type=tools.mirror.Mirror)
+    mirror: bpy.props.PointerProperty(type=tools.props.Mirror)
     # array tool now uses geometry nodes directly, no need for property group
 
 

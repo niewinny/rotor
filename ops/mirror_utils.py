@@ -1,6 +1,7 @@
 import bpy
 import bmesh
 from mathutils import Vector
+from ..utils import addon
 
 
 # Mirror axis state transition table
@@ -94,6 +95,48 @@ def create_mirror_modifier(context, obj, mirror_object, individual, axis_idx, is
 
     mirror_mod.mirror_object = _mirror_object
     mirror_mod.show_expanded = False
+
+    # Apply enabled properties from tool preferences
+    pref = addon.pref().tools.mirror
+
+    # Clipping & Merge
+    if pref.apply_use_clip:
+        mirror_mod.use_clip = pref.use_clip
+
+    if pref.apply_use_mirror_merge:
+        mirror_mod.use_mirror_merge = pref.use_mirror_merge
+
+    if pref.apply_merge_threshold:
+        mirror_mod.merge_threshold = pref.merge_threshold
+
+    if pref.apply_bisect_threshold:
+        mirror_mod.bisect_threshold = pref.bisect_threshold
+
+    # UV Settings
+    if pref.apply_use_mirror_u:
+        mirror_mod.use_mirror_u = pref.use_mirror_u
+
+    if pref.apply_use_mirror_v:
+        mirror_mod.use_mirror_v = pref.use_mirror_v
+
+    if pref.apply_mirror_offset_u:
+        mirror_mod.mirror_offset_u = pref.mirror_offset_u
+
+    if pref.apply_mirror_offset_v:
+        mirror_mod.mirror_offset_v = pref.mirror_offset_v
+
+    if pref.apply_offset_u:
+        mirror_mod.offset_u = pref.offset_u
+
+    if pref.apply_offset_v:
+        mirror_mod.offset_v = pref.offset_v
+
+    # Other Settings
+    if pref.apply_use_mirror_vertex_groups:
+        mirror_mod.use_mirror_vertex_groups = pref.use_mirror_vertex_groups
+
+    if pref.apply_use_mirror_udim:
+        mirror_mod.use_mirror_udim = pref.use_mirror_udim
 
 
 def create_empty_mirror_object(context, location, orientation=(0.0, 0.0, 0.0)):

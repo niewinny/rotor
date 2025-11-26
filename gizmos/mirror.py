@@ -104,6 +104,8 @@ class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
     def _get_arrow_colors_and_highlights(self, context):
         """Return (arrow_colors, arrow_highlights) for the 6 gizmo arrows based on the last mirror modifier."""
         theme_axis = addon.pref().theme.axis
+        mirror_tool = addon.pref().tools.mirror
+        reverse_controls = mirror_tool.reverse_controls
         axis_color_names = ["x", "x", "y", "y", "z", "z"]
         axis_highlight_names = ["x", "x", "y", "y", "z", "z"]
         # Default: all axis colors
@@ -140,6 +142,9 @@ class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
                 for i, (pos_idx, neg_idx) in enumerate([(0, 1), (2, 3), (4, 5)]):
                     axis_color = getattr(theme_axis, "xyz"[i])
                     if mirror_mod.use_axis[i]:
+                        # Swap indices when reverse_controls is enabled
+                        if reverse_controls:
+                            pos_idx, neg_idx = neg_idx, pos_idx
                         if mirror_mod.use_bisect_flip_axis[i]:
                             # Negative axis (X-, Y-, Z-)
                             arrow_colors[neg_idx] = axis_color
@@ -164,12 +169,15 @@ class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
         mirror_tool = addon.pref().tools.mirror
         element = mirror_tool.element
         gizmo_size = mirror_tool.gizmo_size
+        reverse_controls = mirror_tool.reverse_controls
         hide_collection_gizmos = True if element == "OBJECT" else False
         hide_mirror_gizmos = True if element == "COLLECTION" else False
 
         for idx, (axis, axis_name, tag) in enumerate(ARROW_AXES):
             axis = tag[0].upper()  # 'X', 'Y', 'Z'
-            sign = "POS" if tag[1] == "+" else "NEG"
+            # Determine sign based on tag, then invert if reverse_controls is enabled
+            original_sign = "POS" if tag[1] == "+" else "NEG"
+            sign = ("NEG" if original_sign == "POS" else "POS") if reverse_controls else original_sign
             color = arrow_colors[idx]
             axis_highlight_color = arrow_highlights[idx]
 
