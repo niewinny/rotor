@@ -3,14 +3,39 @@ from . import btypes
 from . import __package__ as base_package
 
 
+LINKS = [
+    ("Support Development", "https://superhivemarket.com/creators/ezelar", "FUND"),
+    ("Report Issues", "https://github.com/niewinny/rotor", "URL"),
+    ("Documentation", "https://rotor.ezelar.com", "HELP"),
+    ("Twitter", "https://twitter.com/_arutkowski", "X"),
+]
+
+
+class ROTOR_OT_OpenURL(bpy.types.Operator):
+    bl_idname = "rotor.open_url"
+    bl_label = "Open URL"
+    bl_description = "Open URL in browser"
+
+    url: bpy.props.StringProperty()
+
+    def execute(self, context):
+        import webbrowser
+        webbrowser.open(self.url)
+        return {"FINISHED"}
+
+
 class Rotor_Preference(bpy.types.AddonPreferences):
     bl_idname = base_package
 
     settings: bpy.props.EnumProperty(
         name="Settings",
         description="Settings to display",
-        items=[("OPTIONS", "Options", ""), ("THEME", "Theme", "")],
-        default="OPTIONS",
+        items=[
+            ("INFO", "Info", ""),
+            ("OPTIONS", "Options", ""),
+            ("THEME", "Theme", ""),
+        ],
+        default="INFO",
     )
 
     theme: bpy.props.PointerProperty(type=btypes.Theme)
@@ -25,7 +50,10 @@ class Rotor_Preference(bpy.types.AddonPreferences):
         col = split.column(align=True)
         col.use_property_split = True
 
-        if self.settings == "OPTIONS":
+        if self.settings == "INFO":
+            self.draw_info(col)
+
+        elif self.settings == "OPTIONS":
             col = col.column(align=True)
             mirror = self.tools.mirror
             col.prop(mirror, "gizmo_size")
@@ -52,6 +80,20 @@ class Rotor_Preference(bpy.types.AddonPreferences):
             axis_col.prop(theme.axis, "g")
             axis_col.prop(theme.axis, "n")
 
+    def draw_info(self, layout):
+        box = layout.box()
+        col = box.column(align=True)
+
+        row = col.row()
+        row.alignment = "CENTER"
+        row.scale_y = 2.0
+        row.label(text="ROTOR")
+
+        col.separator()
+        for label, url, icon in LINKS:
+            op = col.operator("rotor.open_url", text=label, icon=icon)
+            op.url = url
+
     def theme_layout(self, layout, theme):
         """Draw a theme layout"""
         for prop in theme.bl_rna.properties:
@@ -62,4 +104,4 @@ class Rotor_Preference(bpy.types.AddonPreferences):
         layout.separator()
 
 
-classes = (Rotor_Preference,)
+classes = (ROTOR_OT_OpenURL, Rotor_Preference)
