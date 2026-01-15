@@ -142,8 +142,11 @@ def create_mirror_modifier(context, obj, mirror_object, individual, axis_idx, is
 def create_empty_mirror_object(context, location, orientation=(0.0, 0.0, 0.0)):
     """Create an empty object at the given location and orientation for use as mirror_object"""
 
+    pref = addon.pref().tools.mirror
+
     empty = bpy.data.objects.new("RotorMirrorPivot", None)
-    empty.empty_display_type = "PLAIN_AXES"
+    empty.empty_display_type = pref.empty_display_type
+    empty.empty_display_size = pref.empty_display_size
     empty.location = location
     empty.rotation_euler = orientation
     context.collection.objects.link(empty)
