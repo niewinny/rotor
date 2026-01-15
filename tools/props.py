@@ -89,6 +89,13 @@ class Mirror(bpy.types.PropertyGroup):
         default=False,
     )
 
+    # === Include Active ===
+    include_active: bpy.props.BoolProperty(
+        name="Include Active",
+        description="Include active object in the mirror operation when using Active pivot",
+        default=True,
+    )
+
     # === Mirror Modifier Properties with Enable Checkboxes ===
     # Clipping & Merge
     apply_use_clip: bpy.props.BoolProperty(

@@ -60,4 +60,6 @@ class ROTOR_MT_Mirror(bpy.types.WorkSpaceTool):
                 label, icon = ("Cursor", "CURSOR")
         row.popover("ROTOR_PT_Pivot", text="", icon=icon)
         row.separator()
-        row.popover("ROTOR_PT_MirrorOptions", text="", icon="MOD_MIRROR")
+        sub = row.row(align=True)
+        sub.popover("ROTOR_PT_ToolOptions", text="", icon="EMPTY_AXIS")
+        sub.popover("ROTOR_PT_MirrorOptions", text="", icon="MOD_MIRROR")
