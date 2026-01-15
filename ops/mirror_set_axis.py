@@ -40,6 +40,9 @@ class ROTOR_OT_SetMirrorAxis(bpy.types.Operator):
         active_object = context.active_object
         objects_without_modifiers = 0
 
+        # Get preferences
+        pref = addon.pref().tools.mirror
+
         # Check if we're enabling or disabling based on active object
         axis_idx = {"X": 0, "Y": 1, "Z": 2}[self.axis]
         is_neg = self.sign == "NEG"
@@ -79,7 +82,8 @@ class ROTOR_OT_SetMirrorAxis(bpy.types.Operator):
         ):
             item = self.affected_objects.add()
             item.name = active_object.name
-            item.enabled = True
+            # Disable active object if include_active is False and pivot is ACTIVE
+            item.enabled = pref.include_active or pref.pivot != "ACTIVE"
             # Check if it has a mirror modifier
             has_mirror = any(m.type == "MIRROR" for m in active_object.modifiers)
             item.has_mirror_modifier = has_mirror

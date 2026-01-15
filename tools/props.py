@@ -89,6 +89,39 @@ class Mirror(bpy.types.PropertyGroup):
         default=False,
     )
 
+    # === Include Active ===
+    include_active: bpy.props.BoolProperty(
+        name="Include Active",
+        description="Include active object in the mirror operation when using Active pivot",
+        default=True,
+    )
+
+    # === Empty Display Settings ===
+    empty_display_type: bpy.props.EnumProperty(
+        name="Empty Display",
+        description="Display type for created empty objects",
+        items=[
+            ("PLAIN_AXES", "Plain Axes", ""),
+            ("ARROWS", "Arrows", ""),
+            ("SINGLE_ARROW", "Single Arrow", ""),
+            ("CIRCLE", "Circle", ""),
+            ("CUBE", "Cube", ""),
+            ("SPHERE", "Sphere", ""),
+            ("CONE", "Cone", ""),
+        ],
+        default="PLAIN_AXES",
+    )
+
+    empty_display_size: bpy.props.FloatProperty(
+        name="Empty Size",
+        description="Size of created empty objects",
+        default=1.0,
+        min=0.01,
+        max=100.0,
+        soft_min=0.1,
+        soft_max=10.0,
+    )
+
     # === Mirror Modifier Properties with Enable Checkboxes ===
     # Clipping & Merge
     apply_use_clip: bpy.props.BoolProperty(

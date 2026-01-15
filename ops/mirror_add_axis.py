@@ -32,6 +32,9 @@ class ROTOR_OT_AddMirrorAxis(bpy.types.Operator):
         self.affected_objects.clear()
         active_object = context.active_object
 
+        # Get preferences
+        pref = addon.pref().tools.mirror
+
         # Add active object first if it's a mesh
         if (
             active_object
@@ -40,7 +43,8 @@ class ROTOR_OT_AddMirrorAxis(bpy.types.Operator):
         ):
             item = self.affected_objects.add()
             item.name = active_object.name
-            item.enabled = True
+            # Disable active object if include_active is False and pivot is ACTIVE
+            item.enabled = pref.include_active or pref.pivot != "ACTIVE"
             # For Add operation, we will add modifiers so mark as having them
             item.has_mirror_modifier = True
 

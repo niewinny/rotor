@@ -70,12 +70,37 @@ class ROTOR_PT_Orientation(bpy.types.Panel):
         col.prop(rotor, "orientation", expand=True)
 
 
+class ROTOR_PT_ToolOptions(bpy.types.Panel):
+    bl_label = "Tool Options"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "WINDOW"
+    bl_description = "Tool options"
+    bl_context = "objectmode"
+    bl_ui_units_x = 12
+
+    def draw(self, context):
+        layout = self.layout
+        rotor = addon.pref().tools.mirror
+
+        layout.use_property_split = True
+        col = layout.column(align=True)
+
+        row = col.row(align=True)
+        row.active = rotor.pivot == "ACTIVE"
+        row.prop(rotor, "include_active")
+
+        col.separator()
+        col.prop(rotor, "empty_display_type", text="Empty Shape")
+        col.prop(rotor, "empty_display_size", text="Empty Size")
+
+
 class ROTOR_PT_MirrorOptions(bpy.types.Panel):
     bl_label = "Mirror Options"
     bl_space_type = "VIEW_3D"
     bl_region_type = "WINDOW"
     bl_description = "Mirror modifier settings"
     bl_context = "objectmode"
+    bl_ui_units_x = 12
 
     def draw(self, context):
         layout = self.layout
@@ -189,5 +214,6 @@ classes = (
     ROTOR_PT_Type,
     ROTOR_PT_Pivot,
     ROTOR_PT_Orientation,
+    ROTOR_PT_ToolOptions,
     ROTOR_PT_MirrorOptions,
 )

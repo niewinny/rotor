@@ -102,7 +102,8 @@ class ROTOR_OT_AddMirrorCollection(bpy.types.Operator):
             empty = bpy.data.objects.new(f"RotorMirrorInstance_{col.name}", None)
             empty.instance_type = "COLLECTION"
             empty.instance_collection = col
-            empty.empty_display_type = "PLAIN_AXES"
+            empty.empty_display_type = pref.empty_display_type
+            empty.empty_display_size = pref.empty_display_size
 
             # Always use -1 scale for mirroring on the selected axis
             scale_vec = [1.0, 1.0, 1.0]
