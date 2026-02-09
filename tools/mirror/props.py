@@ -1,6 +1,5 @@
 import bpy
 
-
 modes = [
     ("MIRROR", "Mirror", "Mirror Modifier"),
     ("SYMMETRY", "Symmetry", "Mirror using Symmetry operation"),
