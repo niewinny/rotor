@@ -1,4 +1,5 @@
 from . import mirror
+from . import duplicate
 from . import props
 from . import panels
 
