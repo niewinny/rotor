@@ -5,6 +5,7 @@ from . import (
     mirror_add_axis,
     mirror_add_collection,
     mirror_fallback_tool,
+    duplicate_modal,
     set_tool,
 )
 
@@ -33,5 +34,6 @@ classes = (
     *mirror_add_axis.classes,
     *mirror_add_collection.classes,
     *mirror_fallback_tool.classes,
+    *duplicate_modal.classes,
     *set_tool.classes,
 )

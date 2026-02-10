@@ -1,9 +1,8 @@
 from . import mirror
-from . import props
-from . import panels
+from . import duplicate
 
 
-types_classes = (*props.classes,)
+types_classes = (*mirror.types_classes, *duplicate.types_classes)
 
 
-classes = (*panels.classes,)
+classes = (*mirror.classes, *duplicate.classes)

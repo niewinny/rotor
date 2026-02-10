@@ -1,6 +1,7 @@
 import bpy
-from bpy.utils import register_class, unregister_class, register_tool, unregister_tool
-from . import btypes, preferences, keymap, ops, gizmos, tools
+from bpy.utils import register_class, register_tool, unregister_class, unregister_tool
+
+from . import btypes, gizmos, keymap, ops, preferences, tools
 from .icons import load_icons, unload_icons
 
 classes = (
@@ -30,13 +31,25 @@ def register():
         # Place under Blockout without separator
         register_tool(
             tools.mirror.ROTOR_MT_Mirror,
-            group=False,
+            group=True,
             separator=False,
             after={"object.bout_block_obj"},
         )
+        register_tool(
+            tools.duplicate.ROTOR_MT_Duplicate,
+            group=False,
+            separator=False,
+            after={"rotor.mirror_tool"},
+        )
     else:
         # Default: use separator
-        register_tool(tools.mirror.ROTOR_MT_Mirror, group=False, separator=True)
+        register_tool(tools.mirror.ROTOR_MT_Mirror, group=True, separator=True)
+        register_tool(
+            tools.duplicate.ROTOR_MT_Duplicate,
+            group=False,
+            separator=False,
+            after={"rotor.mirror_tool"},
+        )
 
     btypes.register()
     keymap.register()
@@ -45,6 +58,7 @@ def register():
 def unregister():
     keymap.unregister()
 
+    unregister_tool(tools.duplicate.ROTOR_MT_Duplicate)
     unregister_tool(tools.mirror.ROTOR_MT_Mirror)
 
     for cls in reversed(classes):

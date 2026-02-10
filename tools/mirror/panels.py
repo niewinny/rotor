@@ -1,5 +1,6 @@
 import bpy
-from ..utils import addon
+
+from ...utils import addon
 
 
 class ROTOR_PT_Element(bpy.types.Panel):

@@ -4,8 +4,8 @@ from . import tools
 
 
 class Tools(bpy.types.PropertyGroup):
-    mirror: bpy.props.PointerProperty(type=tools.props.Mirror)
-    # array tool now uses geometry nodes directly, no need for property group
+    mirror: bpy.props.PointerProperty(type=tools.mirror.props.Mirror)
+    duplicate: bpy.props.PointerProperty(type=tools.duplicate.props.Duplicate)
 
 
 class Scene(bpy.types.PropertyGroup):

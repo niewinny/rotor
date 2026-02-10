@@ -10,6 +10,10 @@ def object_mode_hotkeys(kc):
     # menu hotkey
     kmi = km.keymap_items.new("object.rotor_set_active_tool", "X", "PRESS", alt=True)
     keys.append((km, kmi))
+    # duplicate tool hotkey
+    kmi = km.keymap_items.new("wm.tool_set_by_id", "D", "PRESS", shift=True, alt=True)
+    kmi.properties.name = "rotor.duplicate_tool"
+    keys.append((km, kmi))
 
 
 def register():
