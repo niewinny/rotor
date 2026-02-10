@@ -1,5 +1,5 @@
 import bpy
-from mathutils import Vector
+from mathutils import Matrix, Vector
 from mathutils.geometry import intersect_line_plane
 from bpy_extras.view3d_utils import region_2d_to_origin_3d, region_2d_to_vector_3d
 
@@ -7,6 +7,7 @@ from ..utils import addon
 from ..utils.operator import safe
 from ..utils.scene import ray_cast
 from ..shaders import handle
+from ..shaders.draw import AXIS_DATA
 
 
 def _snap_view(origin, region, rv3d, mouse_pos):
@@ -201,6 +202,8 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
         self._local_rot = obj.matrix_world.to_3x3().normalized()
         self._guide = handle.Guide()
         self._guide.create(context)
+        self._ghost = handle.Ghost()
+        self._ghost.create(context, obj)
         context.window_manager.modal_handler_add(self)
         context.area.tag_redraw()
         return {"RUNNING_MODAL"}
@@ -234,6 +237,19 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
                     axis_x=dup.axis_x, axis_y=dup.axis_y, axis_z=dup.axis_z,
                     orientation=rot,
                 )
+                any_axis = dup.axis_x or dup.axis_y or dup.axis_z
+                if not any_axis:
+                    positions = [point]
+                else:
+                    positions = []
+                    diff = point - self._origin
+                    r = self._local_rot if dup.snap.orientation == "LOCAL" else Matrix.Identity(3)
+                    for name, enabled in [("x", dup.axis_x), ("y", dup.axis_y), ("z", dup.axis_z)]:
+                        if not enabled:
+                            continue
+                        d = r @ AXIS_DATA[name][0]
+                        positions.append(self._origin + d * 2.0 * diff.dot(d))
+                self._ghost.callback.update(positions)
 
         if event.type in {"RIGHTMOUSE", "ESC"}:
             self._cancel(context)
@@ -264,6 +280,7 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
 
     def _cancel(self, context):
         self._guide.remove()
+        self._ghost.remove()
         context.area.tag_redraw()
 
 

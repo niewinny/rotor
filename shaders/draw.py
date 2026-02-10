@@ -114,3 +114,54 @@ class GuideDraw(DrawBase):
         self.shader.uniform_float("viewportSize", (vp_width, vp_height))
         self.shader.uniform_float("lineWidth", self.width)
         gpu.state.blend_set("ALPHA")
+
+
+_BBOX_EDGES = (
+    (0, 1), (1, 2), (2, 3), (3, 0),
+    (4, 5), (5, 6), (6, 7), (7, 4),
+    (0, 4), (1, 5), (2, 6), (3, 7),
+)
+
+
+class GhostDraw(DrawBase):
+    """Draws a bounding-box wireframe ghost of an object at one or more positions."""
+
+    COLOR_GHOST = (0.5, 0.5, 0.5, 0.5)
+
+    def __init__(self):
+        self.shader = gpu.shader.from_builtin("UNIFORM_COLOR")
+        self.batch = None
+        self._edges = []
+
+    def is_valid(self):
+        return self.batch is not None
+
+    def create_batch(self):
+        return self.batch
+
+    def set_object(self, obj):
+        """Cache bounding-box edges as relative vectors (world transform applied, centered at origin)."""
+        mat = obj.matrix_world
+        origin = mat.translation
+        bbox = [mat @ Vector(co) - origin for co in obj.bound_box]
+        self._edges = [(bbox[a], bbox[b]) for a, b in _BBOX_EDGES]
+
+    def update(self, positions):
+        """Rebuild batch with cached edges offset to each position."""
+        if not self._edges or not positions:
+            self.batch = None
+            return
+        vertices = []
+        for pos in positions:
+            for v0_rel, v1_rel in self._edges:
+                vertices.append((v0_rel + pos)[:])
+                vertices.append((v1_rel + pos)[:])
+        self.batch = batch_for_shader(
+            self.shader, "LINES", {"pos": vertices},
+        )
+
+    def setup_draw_state(self, context):
+        gpu.state.depth_test_set("NONE")
+        self.shader.bind()
+        self.shader.uniform_float("color", self.COLOR_GHOST)
+        gpu.state.blend_set("ALPHA")
