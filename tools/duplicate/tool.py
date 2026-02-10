@@ -26,4 +26,5 @@ class ROTOR_MT_Duplicate(bpy.types.WorkSpaceTool):
 
         row.separator_spacer()
 
-        row.prop(dup, "snap", text="Snap")
+        row.prop(dup.snap, "orientation", text="")
+        row.prop(dup.snap, "origin", text="")

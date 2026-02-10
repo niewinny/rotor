@@ -1,6 +1,6 @@
 import bpy
 
-snap_items = [
+origin_items = [
     ("VIEW", "View", "Snap to view plane", "GRID", 1),
     ("ORIGIN", "Origin", "Snap to object origins", "OBJECT_ORIGIN", 2),
     ("FACE", "Face", "Snap to faces", "SNAP_FACE", 3),
@@ -9,6 +9,26 @@ snap_items = [
     ("EDGE_CENTER", "Edge Center", "Snap to edge centers", "SNAP_MIDPOINT", 6),
     ("FACE_CENTER", "Face Center", "Snap to face centers", "SNAP_FACE_CENTER", 7),
 ]
+
+orientation_items = [
+    ("GLOBAL", "Global", "Use global orientation", "ORIENTATION_GLOBAL", 1),
+    ("LOCAL", "Local", "Use local orientation", "ORIENTATION_LOCAL", 2),
+]
+
+
+class DuplicateSnap(bpy.types.PropertyGroup):
+    origin: bpy.props.EnumProperty(
+        name="Origin",
+        description="Snap target for duplicate placement",
+        items=origin_items,
+        default="VIEW",
+    )
+    orientation: bpy.props.EnumProperty(
+        name="Orientation",
+        description="Orientation for snap axes",
+        items=orientation_items,
+        default="GLOBAL",
+    )
 
 
 class Duplicate(bpy.types.PropertyGroup):
@@ -27,12 +47,7 @@ class Duplicate(bpy.types.PropertyGroup):
         description="Constrain duplication to Z axis",
         default=True,
     )
-    snap: bpy.props.EnumProperty(
-        name="Snap",
-        description="Snap target for duplicate placement",
-        items=snap_items,
-        default="VIEW",
-    )
+    snap: bpy.props.PointerProperty(type=DuplicateSnap)
 
 
-classes = (Duplicate,)
+classes = (DuplicateSnap, Duplicate)
