@@ -1,94 +1,12 @@
 import bpy
-import gpu
-from gpu_extras.batch import batch_for_shader
-from mathutils import Matrix, Vector
+from mathutils import Vector
 from mathutils.geometry import intersect_line_plane
 from bpy_extras.view3d_utils import region_2d_to_origin_3d, region_2d_to_vector_3d
 
 from ..utils import addon
+from ..utils.operator import safe
 from ..utils.scene import ray_cast
-
-
-AXIS_CROSS_LENGTH = 0.15
-
-AXIS_DATA = {
-    "x": (Vector((1, 0, 0)), (1.0, 0.2, 0.322, 1.0)),
-    "y": (Vector((0, 1, 0)), (0.545, 0.863, 0.0, 1.0)),
-    "z": (Vector((0, 0, 1)), (0.157, 0.564, 1.0, 1.0)),
-}
-
-
-class GuideDraw:
-    """Draws guide line + axis cross indicators at the endpoint."""
-
-    COLOR_BLACK = (0.0, 0.0, 0.0, 1.0)
-    COLOR_GRAY = (0.5, 0.5, 0.5, 1.0)
-
-    def __init__(self):
-        self.shader = gpu.shader.from_builtin("POLYLINE_FLAT_COLOR")
-        self.batch = None
-        self.width = 1.6
-
-    def update(self, origin, endpoint, axis_x=False, axis_y=False, axis_z=False,
-               orientation=None):
-        has_axis = axis_x or axis_y or axis_z
-        guide_color = self.COLOR_GRAY if has_axis else self.COLOR_BLACK
-        vertices = [origin[:], endpoint[:]]
-        colors = [guide_color, guide_color]
-        indices = [(0, 1)]
-
-        org = Vector(origin)
-        ep = Vector(endpoint)
-        rot = orientation or Matrix.Identity(3)
-        idx = 2
-
-        # Small cross at endpoint — always all 3 axes
-        for name in ("x", "y", "z"):
-            direction, color = AXIS_DATA[name]
-            d = rot @ direction
-            a = ep - d * AXIS_CROSS_LENGTH
-            b = ep + d * AXIS_CROSS_LENGTH
-            vertices.extend([a[:], b[:]])
-            colors.extend([color, color])
-            indices.append((idx, idx + 1))
-            idx += 2
-
-        # Axis lines from origin — mirror across the guide endpoint per axis
-        diff = ep - org
-        axes = {"x": axis_x, "y": axis_y, "z": axis_z}
-        for name, enabled in axes.items():
-            if not enabled:
-                continue
-            direction, color = AXIS_DATA[name]
-            d = rot @ direction
-            b = org + d * 2.0 * diff.dot(d)
-            vertices.extend([org[:], b[:]])
-            colors.extend([color, color])
-            indices.append((idx, idx + 1))
-            idx += 2
-
-        self.batch = batch_for_shader(
-            self.shader,
-            "LINES",
-            {"pos": vertices, "color": colors},
-            indices=indices,
-        )
-
-    def draw(self, context):
-        if self.batch is None:
-            return
-        gpu.state.depth_test_set("NONE")
-        self.shader.bind()
-        vp_width = context.area.width
-        vp_height = context.area.height
-        quad_view = getattr(context.space_data, "region_quadviews", None)
-        if quad_view:
-            vp_width /= 2
-            vp_height /= 2
-        self.shader.uniform_float("viewportSize", (vp_width, vp_height))
-        self.shader.uniform_float("lineWidth", self.width)
-        gpu.state.blend_set("ALPHA")
-        self.batch.draw(self.shader)
+from ..shaders import handle
 
 
 def _snap_view(origin, region, rv3d, mouse_pos):
@@ -281,14 +199,13 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
         self._selection = [o for o in context.selected_objects]
         self._origin = obj.matrix_world.translation.copy()
         self._local_rot = obj.matrix_world.to_3x3().normalized()
-        self._guide = GuideDraw()
-        self._handle = bpy.types.SpaceView3D.draw_handler_add(
-            self._guide.draw, (context,), "WINDOW", "POST_VIEW"
-        )
+        self._guide = handle.Guide()
+        self._guide.create(context)
         context.window_manager.modal_handler_add(self)
         context.area.tag_redraw()
         return {"RUNNING_MODAL"}
 
+    @safe
     def modal(self, context, event):
         context.area.tag_redraw()
         dup = addon.pref().tools.duplicate
@@ -312,18 +229,18 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
             point = self._snap(context, event)
             if point:
                 rot = self._local_rot if dup.snap.orientation == "LOCAL" else None
-                self._guide.update(
+                self._guide.callback.update(
                     self._origin, point,
                     axis_x=dup.axis_x, axis_y=dup.axis_y, axis_z=dup.axis_z,
                     orientation=rot,
                 )
 
         if event.type in {"RIGHTMOUSE", "ESC"}:
-            self._cleanup(context)
+            self._cancel(context)
             return {"CANCELLED"}
 
         if event.type == "LEFTMOUSE" and event.value == "PRESS":
-            self._cleanup(context)
+            self._cancel(context)
             return {"FINISHED"}
 
         return {"RUNNING_MODAL"}
@@ -345,10 +262,8 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
             point = _snap_view(self._origin, region, rv3d, mouse)
         return point
 
-    def _cleanup(self, context):
-        if self._handle:
-            bpy.types.SpaceView3D.draw_handler_remove(self._handle, "WINDOW")
-            self._handle = None
+    def _cancel(self, context):
+        self._guide.remove()
         context.area.tag_redraw()
 
 
