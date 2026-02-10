@@ -65,17 +65,19 @@ class GuideDraw(DrawBase):
         return self.batch
 
     def update(self, origin, endpoint, axis_x=False, axis_y=False, axis_z=False,
-               orientation=None, reflect=False):
+               orientation=None, double=False):
         has_axis = axis_x or axis_y or axis_z
         guide_color = self.COLOR_GRAY if has_axis else self.COLOR_BLACK
-        vertices = [origin[:], endpoint[:]]
-        colors = [guide_color, guide_color]
-        indices = [(0, 1)]
 
         org = Vector(origin)
         ep = Vector(endpoint)
         rot = orientation or Matrix.Identity(3)
-        factor = 2.0 if reflect else 1.0
+        factor = 2.0 if double else 1.0
+
+        guide_ep = ep if has_axis else org + (ep - org) * factor
+        vertices = [origin[:], guide_ep[:]]
+        colors = [guide_color, guide_color]
+        indices = [(0, 1)]
         idx = 2
 
         for name in ("x", "y", "z"):

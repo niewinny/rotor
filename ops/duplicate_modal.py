@@ -174,7 +174,7 @@ _SNAP_FUNCTIONS = {
     "FACE_CENTER": _snap_face_center,
 }
 
-_PIVOT_CYCLE = ("ORIGIN", "FACE", "VERTEX", "EDGE", "EDGE_CENTER", "FACE_CENTER")
+_PIVOT_CYCLE = ("INCREMENT", "GRID", "ORIGIN", "FACE", "VERTEX", "EDGE", "EDGE_CENTER", "FACE_CENTER")
 _ORIENTATION_CYCLE = ("GLOBAL", "LOCAL")
 
 
@@ -257,8 +257,8 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
             dup.scale = max(0.01, round(dup.scale - step, 2))
             return {"RUNNING_MODAL"}
 
-        if event.type == "R" and event.value == "PRESS":
-            dup.reflect = not dup.reflect
+        if event.type == "D" and event.value == "PRESS":
+            dup.double = not dup.double
             return {"RUNNING_MODAL"}
 
         if event.type == "MOUSEMOVE":
@@ -269,7 +269,7 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
                 self._guide.callback.update(
                     self._origin, point,
                     axis_x=dup.axis_x, axis_y=dup.axis_y, axis_z=dup.axis_z,
-                    orientation=rot, reflect=dup.reflect,
+                    orientation=rot, double=dup.double,
                 )
                 self._ghost.callback.update(
                     self._ghost_positions(point, dup)
@@ -292,9 +292,11 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
         mouse = Vector((event.mouse_region_x, event.mouse_region_y))
 
         use_snap = context.tool_settings.use_snap != event.ctrl
+        pivot = addon.pref().tools.duplicate.snap.pivot
         point = None
-        if use_snap:
-            snap_fn = _SNAP_FUNCTIONS.get(addon.pref().tools.duplicate.snap.pivot)
+
+        if use_snap and pivot not in {"INCREMENT", "GRID"}:
+            snap_fn = _SNAP_FUNCTIONS.get(pivot)
             point = snap_fn(context, mouse, self._exclude) if snap_fn else None
 
             # Raycast may deselect objects — restore selection
@@ -304,17 +306,46 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
 
         if point is None:
             point = _snap_view(self._origin, region, rv3d, mouse)
+
+        if use_snap and point:
+            if pivot == "INCREMENT":
+                point = self._snap_increment(context, point)
+            elif pivot == "GRID":
+                point = self._snap_grid(context, point)
+
         return point
+
+    @staticmethod
+    def _grid_step(context):
+        overlay = context.space_data.overlay
+        return overlay.grid_scale / overlay.grid_subdivisions
+
+    def _snap_increment(self, context, point):
+        """Snap the offset from origin to the nearest grid increment."""
+        step = self._grid_step(context)
+        offset = point - self._origin
+        for i in range(3):
+            offset[i] = round(offset[i] / step) * step
+        return self._origin + offset
+
+    @staticmethod
+    def _snap_grid(context, point):
+        """Snap the absolute position to the nearest grid line."""
+        step = ROTOR_OT_DuplicateModal._grid_step(context)
+        snapped = point.copy()
+        for i in range(3):
+            snapped[i] = round(point[i] / step) * step
+        return snapped
 
     def _ghost_offsets(self, point, dup):
         """Compute direction offsets from grabbed object's origin."""
         diff = point - self._origin
         any_axis = dup.axis_x or dup.axis_y or dup.axis_z
+        factor = 2.0 if dup.double else 1.0
         offsets = []
         if not any_axis:
-            offsets.append(diff)
+            offsets.append(diff * factor)
         else:
-            factor = 2.0 if dup.reflect else 1.0
             r = self._local_rot if dup.snap.orientation == "LOCAL" else Matrix.Identity(3)
             for name, enabled in [("x", dup.axis_x), ("y", dup.axis_y), ("z", dup.axis_z)]:
                 if not enabled:

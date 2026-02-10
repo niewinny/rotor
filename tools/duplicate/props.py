@@ -1,12 +1,14 @@
 import bpy
 
 pivot_items = [
-    ("ORIGIN", "Origin", "Snap to object origins", "OBJECT_ORIGIN", 1),
-    ("FACE", "Face", "Snap to faces", "SNAP_FACE", 2),
-    ("VERTEX", "Vertex", "Snap to vertices", "SNAP_VERTEX", 3),
-    ("EDGE", "Edge", "Snap to edges", "SNAP_EDGE", 4),
-    ("EDGE_CENTER", "Edge Center", "Snap to edge centers", "SNAP_MIDPOINT", 5),
-    ("FACE_CENTER", "Face Center", "Snap to face centers", "SNAP_FACE_CENTER", 6),
+    ("INCREMENT", "Increment", "Snap to grid increments", "SNAP_INCREMENT", 1),
+    ("GRID", "Grid", "Snap to absolute grid positions", "SNAP_GRID", 2),
+    ("ORIGIN", "Origin", "Snap to object origins", "OBJECT_ORIGIN", 3),
+    ("FACE", "Face", "Snap to faces", "SNAP_FACE", 4),
+    ("VERTEX", "Vertex", "Snap to vertices", "SNAP_VERTEX", 5),
+    ("EDGE", "Edge", "Snap to edges", "SNAP_EDGE", 6),
+    ("EDGE_CENTER", "Edge Center", "Snap to edge centers", "SNAP_MIDPOINT", 7),
+    ("FACE_CENTER", "Face Center", "Snap to face centers", "SNAP_FACE_CENTER", 8),
 ]
 
 orientation_items = [
@@ -20,7 +22,7 @@ class DuplicateSnap(bpy.types.PropertyGroup):
         name="Pivot",
         description="Snap target for duplicate placement",
         items=pivot_items,
-        default="ORIGIN",
+        default="INCREMENT",
     )
     orientation: bpy.props.EnumProperty(
         name="Orientation",
@@ -52,9 +54,9 @@ class Duplicate(bpy.types.PropertyGroup):
         default=1,
         min=1,
     )
-    reflect: bpy.props.BoolProperty(
-        name="Full",
-        description="Double axis projection distance",
+    double: bpy.props.BoolProperty(
+        name="Double",
+        description="Double the guide distance",
         default=False,
     )
     scale: bpy.props.FloatProperty(
