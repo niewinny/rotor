@@ -1,6 +1,6 @@
 import bpy
 
-origin_items = [
+pivot_items = [
     ("VIEW", "View", "Snap to view plane", "GRID", 1),
     ("ORIGIN", "Origin", "Snap to object origins", "OBJECT_ORIGIN", 2),
     ("FACE", "Face", "Snap to faces", "SNAP_FACE", 3),
@@ -17,10 +17,10 @@ orientation_items = [
 
 
 class DuplicateSnap(bpy.types.PropertyGroup):
-    origin: bpy.props.EnumProperty(
-        name="Origin",
+    pivot: bpy.props.EnumProperty(
+        name="Pivot",
         description="Snap target for duplicate placement",
-        items=origin_items,
+        items=pivot_items,
         default="VIEW",
     )
     orientation: bpy.props.EnumProperty(
