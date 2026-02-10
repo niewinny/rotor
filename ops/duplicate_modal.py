@@ -174,7 +174,7 @@ _SNAP_FUNCTIONS = {
     "FACE_CENTER": _snap_face_center,
 }
 
-_PIVOT_CYCLE = ("VIEW", "ORIGIN", "FACE", "VERTEX", "EDGE", "EDGE_CENTER", "FACE_CENTER")
+_PIVOT_CYCLE = ("ORIGIN", "FACE", "VERTEX", "EDGE", "EDGE_CENTER", "FACE_CENTER")
 _ORIENTATION_CYCLE = ("GLOBAL", "LOCAL")
 
 
@@ -257,6 +257,10 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
             dup.scale = max(0.01, round(dup.scale - step, 2))
             return {"RUNNING_MODAL"}
 
+        if event.type == "R" and event.value == "PRESS":
+            dup.reflection = not dup.reflection
+            return {"RUNNING_MODAL"}
+
         if event.type == "MOUSEMOVE":
             point = self._snap(context, event)
             if point:
@@ -265,7 +269,7 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
                 self._guide.callback.update(
                     self._origin, point,
                     axis_x=dup.axis_x, axis_y=dup.axis_y, axis_z=dup.axis_z,
-                    orientation=rot,
+                    orientation=rot, full=dup.reflection,
                 )
                 self._ghost.callback.update(
                     self._ghost_positions(point, dup)
@@ -287,13 +291,16 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
         rv3d = context.region_data
         mouse = Vector((event.mouse_region_x, event.mouse_region_y))
 
-        snap_fn = _SNAP_FUNCTIONS.get(addon.pref().tools.duplicate.snap.pivot)
-        point = snap_fn(context, mouse, self._exclude) if snap_fn else None
+        use_snap = context.tool_settings.use_snap != event.ctrl
+        point = None
+        if use_snap:
+            snap_fn = _SNAP_FUNCTIONS.get(addon.pref().tools.duplicate.snap.pivot)
+            point = snap_fn(context, mouse, self._exclude) if snap_fn else None
 
-        # Raycast may deselect objects — restore selection
-        for obj in self._selection:
-            if not obj.select_get():
-                obj.select_set(True)
+            # Raycast may deselect objects — restore selection
+            for obj in self._selection:
+                if not obj.select_get():
+                    obj.select_set(True)
 
         if point is None:
             point = _snap_view(self._origin, region, rv3d, mouse)
@@ -307,12 +314,13 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
         if not any_axis:
             offsets.append(diff)
         else:
+            factor = 2.0 if dup.reflection else 1.0
             r = self._local_rot if dup.snap.orientation == "LOCAL" else Matrix.Identity(3)
             for name, enabled in [("x", dup.axis_x), ("y", dup.axis_y), ("z", dup.axis_z)]:
                 if not enabled:
                     continue
                 d = r @ AXIS_DATA[name][0]
-                offsets.append(d * 2.0 * diff.dot(d))
+                offsets.append(d * factor * diff.dot(d))
         return offsets
 
     def _ghost_positions(self, point, dup):
