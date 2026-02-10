@@ -25,7 +25,7 @@ class ROTOR_MT_Duplicate(bpy.types.WorkSpaceTool):
         row.prop(dup, "axis_z", toggle=True)
         row.prop(dup, "count")
         row.prop(dup, "scale")
-        row.prop(dup, "reflection", toggle=True)
+        row.prop(dup, "reflect", toggle=True)
 
         row.separator_spacer()
 

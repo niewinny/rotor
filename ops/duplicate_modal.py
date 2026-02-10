@@ -258,7 +258,7 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
             return {"RUNNING_MODAL"}
 
         if event.type == "R" and event.value == "PRESS":
-            dup.reflection = not dup.reflection
+            dup.reflect = not dup.reflect
             return {"RUNNING_MODAL"}
 
         if event.type == "MOUSEMOVE":
@@ -269,7 +269,7 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
                 self._guide.callback.update(
                     self._origin, point,
                     axis_x=dup.axis_x, axis_y=dup.axis_y, axis_z=dup.axis_z,
-                    orientation=rot, full=dup.reflection,
+                    orientation=rot, reflect=dup.reflect,
                 )
                 self._ghost.callback.update(
                     self._ghost_positions(point, dup)
@@ -314,7 +314,7 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
         if not any_axis:
             offsets.append(diff)
         else:
-            factor = 2.0 if dup.reflection else 1.0
+            factor = 2.0 if dup.reflect else 1.0
             r = self._local_rot if dup.snap.orientation == "LOCAL" else Matrix.Identity(3)
             for name, enabled in [("x", dup.axis_x), ("y", dup.axis_y), ("z", dup.axis_z)]:
                 if not enabled:

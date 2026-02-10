@@ -52,7 +52,7 @@ class Duplicate(bpy.types.PropertyGroup):
         default=1,
         min=1,
     )
-    reflection: bpy.props.BoolProperty(
+    reflect: bpy.props.BoolProperty(
         name="Full",
         description="Double axis projection distance",
         default=False,
