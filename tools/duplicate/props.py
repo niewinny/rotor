@@ -1,5 +1,10 @@
 import bpy
 
+mode_items = [
+    ("LINEAR", "Linear", "Distribute duplicates along the guide", "ARROW_LEFTRIGHT", 1),
+    ("CIRCLE", "Circle", "Distribute duplicates in a circle", "MESH_CIRCLE", 2),
+]
+
 pivot_items = [
     ("INCREMENT", "Increment", "Snap to grid increments", "SNAP_INCREMENT", 1),
     ("GRID", "Grid", "Snap to absolute grid positions", "SNAP_GRID", 2),
@@ -33,6 +38,12 @@ class DuplicateSnap(bpy.types.PropertyGroup):
 
 
 class Duplicate(bpy.types.PropertyGroup):
+    mode: bpy.props.EnumProperty(
+        name="Mode",
+        description="Distribution mode for duplicates",
+        items=mode_items,
+        default="LINEAR",
+    )
     axis_x: bpy.props.BoolProperty(
         name="X",
         description="Constrain duplication to X axis",

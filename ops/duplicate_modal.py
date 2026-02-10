@@ -1,3 +1,5 @@
+from math import pi
+
 import bpy
 from mathutils import Matrix, Vector
 from mathutils.geometry import intersect_line_plane
@@ -174,6 +176,7 @@ _SNAP_FUNCTIONS = {
     "FACE_CENTER": _snap_face_center,
 }
 
+_MODE_CYCLE = ("LINEAR", "CIRCLE")
 _PIVOT_CYCLE = ("INCREMENT", "GRID", "ORIGIN", "FACE", "VERTEX", "EDGE", "EDGE_CENTER", "FACE_CENTER")
 _ORIENTATION_CYCLE = ("GLOBAL", "LOCAL")
 
@@ -228,6 +231,11 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
             dup.axis_z = False
             return {"RUNNING_MODAL"}
 
+        if event.type == "C" and event.value == "PRESS":
+            cur = _MODE_CYCLE.index(dup.mode)
+            dup.mode = _MODE_CYCLE[(cur + 1) % len(_MODE_CYCLE)]
+            return {"RUNNING_MODAL"}
+
         if event.type == "O" and event.value == "PRESS":
             cur = _ORIENTATION_CYCLE.index(dup.snap.orientation)
             dup.snap.orientation = _ORIENTATION_CYCLE[(cur + 1) % len(_ORIENTATION_CYCLE)]
@@ -266,13 +274,16 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
             if point:
                 self._last_point = point
                 rot = self._local_rot if dup.snap.orientation == "LOCAL" else None
+                is_circle = dup.mode == "CIRCLE"
                 self._guide.callback.update(
                     self._origin, point,
                     axis_x=dup.axis_x, axis_y=dup.axis_y, axis_z=dup.axis_z,
-                    orientation=rot, double=dup.double,
+                    orientation=rot,
+                    double=dup.double and not is_circle,
+                    circle=is_circle,
                 )
                 self._ghost.callback.update(
-                    self._ghost_positions(point, dup)
+                    self._ghost_positions(point, dup, context)
                 )
 
         if event.type in {"RIGHTMOUSE", "ESC"}:
@@ -341,7 +352,8 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
         """Compute direction offsets from grabbed object's origin."""
         diff = point - self._origin
         any_axis = dup.axis_x or dup.axis_y or dup.axis_z
-        factor = 2.0 if dup.double else 1.0
+        is_circle = dup.mode == "CIRCLE"
+        factor = 1.0 if is_circle else (2.0 if dup.double else 1.0)
         offsets = []
         if not any_axis:
             offsets.append(diff * factor)
@@ -354,18 +366,49 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
                 offsets.append(d * factor * diff.dot(d))
         return offsets
 
-    def _ghost_positions(self, point, dup):
-        """Compute ghost placements (position, scale) subdivided by count."""
+    @staticmethod
+    def _view_normal(context):
+        rv3d = context.region_data
+        return -rv3d.view_matrix.inverted().col[2].to_3d().normalized()
+
+    def _circle_axes(self, dup, context):
+        """Return rotation axes for circle mode based on axis constraints."""
+        any_axis = dup.axis_x or dup.axis_y or dup.axis_z
+        if not any_axis:
+            return [self._view_normal(context)]
+        r = self._local_rot if dup.snap.orientation == "LOCAL" else Matrix.Identity(3)
+        axes = []
+        for name, enabled in [("x", dup.axis_x), ("y", dup.axis_y), ("z", dup.axis_z)]:
+            if not enabled:
+                continue
+            axes.append(r @ AXIS_DATA[name][0])
+        return axes
+
+    def _ghost_positions(self, point, dup, context):
+        """Compute ghost placements (position, scale) for current mode."""
         count = dup.count
         scale = dup.scale
-        offsets = self._ghost_offsets(point, dup)
         placements = []
-        for org in self._origins:
-            for offset in offsets:
-                for i in range(1, count + 1):
-                    t = i / count
-                    s = 1.0 + (scale - 1.0) * t
-                    placements.append((org + offset * t, s))
+
+        if dup.mode == "CIRCLE":
+            diff = point - self._origin
+            rot_axes = self._circle_axes(dup, context)
+            for org in self._origins:
+                center = org + diff
+                radius = -diff
+                for axis in rot_axes:
+                    for i in range(1, count + 1):
+                        angle = 2 * pi * i / (count + 1)
+                        rot = Matrix.Rotation(angle, 3, axis)
+                        placements.append((center + rot @ radius, scale))
+        else:
+            offsets = self._ghost_offsets(point, dup)
+            for org in self._origins:
+                for offset in offsets:
+                    for i in range(1, count + 1):
+                        t = i / count
+                        s = 1.0 + (scale - 1.0) * t
+                        placements.append((org + offset * t, s))
         return placements
 
     def _finish(self, context):
@@ -379,24 +422,46 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
         dup = addon.pref().tools.duplicate
         count = dup.count
         scale = dup.scale
-        offsets = self._ghost_offsets(self._last_point, dup)
+        is_circle = dup.mode == "CIRCLE"
 
         new_objects = []
-        for obj in self._selection:
-            org = obj.matrix_world.translation
-            for offset in offsets:
-                for i in range(1, count + 1):
-                    t = i / count
-                    s = 1.0 + (scale - 1.0) * t
-                    pos = org + offset * t
+        if is_circle:
+            diff = self._last_point - self._origin
+            rot_axes = self._circle_axes(dup, context)
+            for obj in self._selection:
+                org = obj.matrix_world.translation
+                center = org + diff
+                radius = -diff
+                for axis in rot_axes:
+                    for i in range(1, count + 1):
+                        angle = 2 * pi * i / (count + 1)
+                        rot = Matrix.Rotation(angle, 3, axis)
+                        pos = center + rot @ radius
 
-                    new_obj = obj.copy()
-                    new_obj.data = obj.data.copy()
-                    for col in obj.users_collection:
-                        col.objects.link(new_obj)
-                    new_obj.location = pos
-                    new_obj.scale = obj.scale * s
-                    new_objects.append(new_obj)
+                        new_obj = obj.copy()
+                        new_obj.data = obj.data.copy()
+                        for col in obj.users_collection:
+                            col.objects.link(new_obj)
+                        new_obj.location = pos
+                        new_obj.scale = obj.scale * scale
+                        new_objects.append(new_obj)
+        else:
+            offsets = self._ghost_offsets(self._last_point, dup)
+            for obj in self._selection:
+                org = obj.matrix_world.translation
+                for offset in offsets:
+                    for i in range(1, count + 1):
+                        t = i / count
+                        s = 1.0 + (scale - 1.0) * t
+                        pos = org + offset * t
+
+                        new_obj = obj.copy()
+                        new_obj.data = obj.data.copy()
+                        for col in obj.users_collection:
+                            col.objects.link(new_obj)
+                        new_obj.location = pos
+                        new_obj.scale = obj.scale * s
+                        new_objects.append(new_obj)
 
         # Select only the new objects
         for obj in self._selection:

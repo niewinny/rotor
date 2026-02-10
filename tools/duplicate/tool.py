@@ -19,13 +19,18 @@ class ROTOR_MT_Duplicate(bpy.types.WorkSpaceTool):
         dup = addon.pref().tools.duplicate
         row = layout.row(align=True)
 
+        row.prop(dup, "mode", text="")
+        row.prop(dup, "count")
+        row.prop(dup, "scale")
+
+        row.separator()
+
         row.label(text="Axis:")
         row.prop(dup, "axis_x", toggle=True)
         row.prop(dup, "axis_y", toggle=True)
         row.prop(dup, "axis_z", toggle=True)
-        row.prop(dup, "count")
-        row.prop(dup, "scale")
-        row.prop(dup, "double", toggle=True)
+        if dup.mode == "LINEAR":
+            row.prop(dup, "double", toggle=True)
 
         row.separator_spacer()
 

@@ -65,7 +65,7 @@ class GuideDraw(DrawBase):
         return self.batch
 
     def update(self, origin, endpoint, axis_x=False, axis_y=False, axis_z=False,
-               orientation=None, double=False):
+               orientation=None, double=False, circle=False):
         has_axis = axis_x or axis_y or axis_z
         guide_color = self.COLOR_GRAY if has_axis else self.COLOR_BLACK
 
@@ -97,8 +97,12 @@ class GuideDraw(DrawBase):
                 continue
             direction, color = AXIS_DATA[name]
             d = rot @ direction
-            b = org + d * factor * diff.dot(d)
-            vertices.extend([org[:], b[:]])
+            if circle:
+                b = ep - d * diff.dot(d)
+                vertices.extend([ep[:], b[:]])
+            else:
+                b = org + d * factor * diff.dot(d)
+                vertices.extend([org[:], b[:]])
             colors.extend([color, color])
             indices.append((idx, idx + 1))
             idx += 2
