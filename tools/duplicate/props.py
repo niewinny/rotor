@@ -35,17 +35,31 @@ class Duplicate(bpy.types.PropertyGroup):
     axis_x: bpy.props.BoolProperty(
         name="X",
         description="Constrain duplication to X axis",
-        default=True,
+        default=False,
     )
     axis_y: bpy.props.BoolProperty(
         name="Y",
         description="Constrain duplication to Y axis",
-        default=True,
+        default=False,
     )
     axis_z: bpy.props.BoolProperty(
         name="Z",
         description="Constrain duplication to Z axis",
-        default=True,
+        default=False,
+    )
+    count: bpy.props.IntProperty(
+        name="Count",
+        description="Number of duplicates along the guide",
+        default=1,
+        min=1,
+    )
+    scale: bpy.props.FloatProperty(
+        name="Scale",
+        description="Scale factor for duplicates (interpolated along guide)",
+        default=1.0,
+        min=0.01,
+        soft_min=0.1,
+        soft_max=10.0,
     )
     snap: bpy.props.PointerProperty(type=DuplicateSnap)
 

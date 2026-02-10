@@ -228,6 +228,25 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
             dup.snap.pivot = _PIVOT_CYCLE[(cur + 1) % len(_PIVOT_CYCLE)]
             return {"RUNNING_MODAL"}
 
+        if event.type == "RIGHT_BRACKET" and event.value == "PRESS":
+            dup.count += 1
+            return {"RUNNING_MODAL"}
+
+        if event.type == "LEFT_BRACKET" and event.value == "PRESS":
+            if dup.count > 1:
+                dup.count -= 1
+            return {"RUNNING_MODAL"}
+
+        if event.type == "QUOTE" and event.value == "PRESS":
+            step = 0.01 if event.shift else 0.1
+            dup.scale = round(dup.scale + step, 2)
+            return {"RUNNING_MODAL"}
+
+        if event.type == "SEMI_COLON" and event.value == "PRESS":
+            step = 0.01 if event.shift else 0.1
+            dup.scale = max(0.01, round(dup.scale - step, 2))
+            return {"RUNNING_MODAL"}
+
         if event.type == "MOUSEMOVE":
             point = self._snap(context, event)
             if point:
@@ -237,19 +256,9 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
                     axis_x=dup.axis_x, axis_y=dup.axis_y, axis_z=dup.axis_z,
                     orientation=rot,
                 )
-                any_axis = dup.axis_x or dup.axis_y or dup.axis_z
-                if not any_axis:
-                    positions = [point]
-                else:
-                    positions = []
-                    diff = point - self._origin
-                    r = self._local_rot if dup.snap.orientation == "LOCAL" else Matrix.Identity(3)
-                    for name, enabled in [("x", dup.axis_x), ("y", dup.axis_y), ("z", dup.axis_z)]:
-                        if not enabled:
-                            continue
-                        d = r @ AXIS_DATA[name][0]
-                        positions.append(self._origin + d * 2.0 * diff.dot(d))
-                self._ghost.callback.update(positions)
+                self._ghost.callback.update(
+                    self._ghost_positions(point, dup)
+                )
 
         if event.type in {"RIGHTMOUSE", "ESC"}:
             self._cancel(context)
@@ -277,6 +286,30 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
         if point is None:
             point = _snap_view(self._origin, region, rv3d, mouse)
         return point
+
+    def _ghost_positions(self, point, dup):
+        """Compute ghost placements (position, scale) subdivided by count."""
+        count = dup.count
+        scale = dup.scale
+        any_axis = dup.axis_x or dup.axis_y or dup.axis_z
+        endpoints = []
+        if not any_axis:
+            endpoints.append(point)
+        else:
+            diff = point - self._origin
+            r = self._local_rot if dup.snap.orientation == "LOCAL" else Matrix.Identity(3)
+            for name, enabled in [("x", dup.axis_x), ("y", dup.axis_y), ("z", dup.axis_z)]:
+                if not enabled:
+                    continue
+                d = r @ AXIS_DATA[name][0]
+                endpoints.append(self._origin + d * 2.0 * diff.dot(d))
+        placements = []
+        for ep in endpoints:
+            for i in range(1, count + 1):
+                t = i / count
+                s = 1.0 + (scale - 1.0) * t
+                placements.append((self._origin.lerp(ep, t), s))
+        return placements
 
     def _cancel(self, context):
         self._guide.remove()

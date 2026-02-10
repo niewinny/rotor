@@ -146,16 +146,19 @@ class GhostDraw(DrawBase):
         bbox = [mat @ Vector(co) - origin for co in obj.bound_box]
         self._edges = [(bbox[a], bbox[b]) for a, b in _BBOX_EDGES]
 
-    def update(self, positions):
-        """Rebuild batch with cached edges offset to each position."""
-        if not self._edges or not positions:
+    def update(self, placements):
+        """Rebuild batch with cached edges offset and scaled per placement.
+
+        placements: list of (position, scale) tuples.
+        """
+        if not self._edges or not placements:
             self.batch = None
             return
         vertices = []
-        for pos in positions:
+        for pos, scale in placements:
             for v0_rel, v1_rel in self._edges:
-                vertices.append((v0_rel + pos)[:])
-                vertices.append((v1_rel + pos)[:])
+                vertices.append((v0_rel * scale + pos)[:])
+                vertices.append((v1_rel * scale + pos)[:])
         self.batch = batch_for_shader(
             self.shader, "LINES", {"pos": vertices},
         )
