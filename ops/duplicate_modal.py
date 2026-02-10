@@ -191,14 +191,17 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
     )
 
     def invoke(self, context, event):
-        obj = bpy.data.objects.get(self.object_name)
+        obj = bpy.data.objects.get(self.object_name) if self.object_name else None
         if not obj:
-            self.report({"WARNING"}, f"Object '{self.object_name}' not found")
+            obj = context.active_object
+        if not obj:
+            self.report({"WARNING"}, "No object found")
             return {"CANCELLED"}
 
         self._exclude = {obj}
         self._selection = [o for o in context.selected_objects]
         self._origin = obj.matrix_world.translation.copy()
+        self._origins = [o.matrix_world.translation.copy() for o in self._selection]
         self._local_rot = obj.matrix_world.to_3x3().normalized()
         self._guide = handle.Guide()
         self._guide.create(context)
@@ -291,24 +294,29 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
         """Compute ghost placements (position, scale) subdivided by count."""
         count = dup.count
         scale = dup.scale
+        diff = point - self._origin
         any_axis = dup.axis_x or dup.axis_y or dup.axis_z
-        endpoints = []
+
+        # Compute offsets relative to grabbed object's origin
+        offsets = []
         if not any_axis:
-            endpoints.append(point)
+            offsets.append(diff)
         else:
-            diff = point - self._origin
             r = self._local_rot if dup.snap.orientation == "LOCAL" else Matrix.Identity(3)
             for name, enabled in [("x", dup.axis_x), ("y", dup.axis_y), ("z", dup.axis_z)]:
                 if not enabled:
                     continue
                 d = r @ AXIS_DATA[name][0]
-                endpoints.append(self._origin + d * 2.0 * diff.dot(d))
+                offsets.append(d * 2.0 * diff.dot(d))
+
+        # Apply subdivided offsets from each selected object's origin
         placements = []
-        for ep in endpoints:
-            for i in range(1, count + 1):
-                t = i / count
-                s = 1.0 + (scale - 1.0) * t
-                placements.append((self._origin.lerp(ep, t), s))
+        for org in self._origins:
+            for offset in offsets:
+                for i in range(1, count + 1):
+                    t = i / count
+                    s = 1.0 + (scale - 1.0) * t
+                    placements.append((org + offset * t, s))
         return placements
 
     def _cancel(self, context):
