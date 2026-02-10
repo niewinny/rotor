@@ -1,7 +1,7 @@
 import bpy
 import gpu
 from gpu_extras.batch import batch_for_shader
-from mathutils import Vector
+from mathutils import Matrix, Vector
 from mathutils.geometry import intersect_line_plane
 from bpy_extras.view3d_utils import region_2d_to_origin_3d, region_2d_to_vector_3d
 
@@ -9,27 +9,70 @@ from ..utils import addon
 from ..utils.scene import ray_cast
 
 
-class GuideLine:
-    """Draws a line between two 3D points in the viewport."""
+AXIS_CROSS_LENGTH = 0.15
+
+AXIS_DATA = {
+    "x": (Vector((1, 0, 0)), (1.0, 0.2, 0.322, 1.0)),
+    "y": (Vector((0, 1, 0)), (0.545, 0.863, 0.0, 1.0)),
+    "z": (Vector((0, 0, 1)), (0.157, 0.564, 1.0, 1.0)),
+}
+
+
+class GuideDraw:
+    """Draws guide line + axis cross indicators at the endpoint."""
+
+    COLOR_BLACK = (0.0, 0.0, 0.0, 1.0)
+    COLOR_GRAY = (0.5, 0.5, 0.5, 1.0)
 
     def __init__(self):
         self.shader = gpu.shader.from_builtin("POLYLINE_FLAT_COLOR")
         self.batch = None
-        self.color = (0.0, 0.0, 0.0, 1.0)
         self.width = 1.6
 
-    def update(self, point_a, point_b):
-        vertices = [point_a[:], point_b[:]]
-        vertex_colors = [self.color, self.color]
+    def update(self, origin, endpoint, axis_x=False, axis_y=False, axis_z=False,
+               orientation=None):
+        has_axis = axis_x or axis_y or axis_z
+        guide_color = self.COLOR_GRAY if has_axis else self.COLOR_BLACK
+        vertices = [origin[:], endpoint[:]]
+        colors = [guide_color, guide_color]
+        indices = [(0, 1)]
+
+        org = Vector(origin)
+        ep = Vector(endpoint)
+        rot = orientation or Matrix.Identity(3)
+        idx = 2
+
+        # Small cross at endpoint — always all 3 axes
+        for name in ("x", "y", "z"):
+            direction, color = AXIS_DATA[name]
+            d = rot @ direction
+            a = ep - d * AXIS_CROSS_LENGTH
+            b = ep + d * AXIS_CROSS_LENGTH
+            vertices.extend([a[:], b[:]])
+            colors.extend([color, color])
+            indices.append((idx, idx + 1))
+            idx += 2
+
+        # Axis lines from origin — mirror across the guide endpoint per axis
+        diff = ep - org
+        axes = {"x": axis_x, "y": axis_y, "z": axis_z}
+        for name, enabled in axes.items():
+            if not enabled:
+                continue
+            direction, color = AXIS_DATA[name]
+            d = rot @ direction
+            b = org + d * 2.0 * diff.dot(d)
+            vertices.extend([org[:], b[:]])
+            colors.extend([color, color])
+            indices.append((idx, idx + 1))
+            idx += 2
+
         self.batch = batch_for_shader(
             self.shader,
             "LINES",
-            {"pos": vertices, "color": vertex_colors},
-            indices=[(0, 1)],
+            {"pos": vertices, "color": colors},
+            indices=indices,
         )
-
-    def clear(self):
-        self.batch = None
 
     def draw(self, context):
         if self.batch is None:
@@ -59,7 +102,7 @@ def _snap_view(origin, region, rv3d, mouse_pos):
         view_normal = -rv3d.view_matrix.inverted().col[2].to_3d().normalized()
 
     point = intersect_line_plane(
-        ray_origin, ray_origin + ray_dir, origin, view_normal
+        ray_origin, ray_origin + ray_dir, origin, view_normal,
     )
     return point
 
@@ -203,6 +246,19 @@ def _closest_point_on_segment(point, a, b):
     return a + ab * t
 
 
+_SNAP_FUNCTIONS = {
+    "ORIGIN": _snap_origin,
+    "FACE": _snap_face,
+    "VERTEX": _snap_vertex,
+    "EDGE": _snap_edge,
+    "EDGE_CENTER": _snap_edge_center,
+    "FACE_CENTER": _snap_face_center,
+}
+
+_PIVOT_CYCLE = ("VIEW", "ORIGIN", "FACE", "VERTEX", "EDGE", "EDGE_CENTER", "FACE_CENTER")
+_ORIENTATION_CYCLE = ("GLOBAL", "LOCAL")
+
+
 class ROTOR_OT_DuplicateModal(bpy.types.Operator):
     """Duplicate object with visual guide"""
 
@@ -221,25 +277,46 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
             self.report({"WARNING"}, f"Object '{self.object_name}' not found")
             return {"CANCELLED"}
 
-        self.source_obj = obj
-        self.exclude = {obj}
-        self.origin = obj.matrix_world.translation.copy()
-        self.guide = GuideLine()
+        self._exclude = {obj}
+        self._selection = [o for o in context.selected_objects]
+        self._origin = obj.matrix_world.translation.copy()
+        self._local_rot = obj.matrix_world.to_3x3().normalized()
+        self._guide = GuideDraw()
         self._handle = bpy.types.SpaceView3D.draw_handler_add(
-            self.guide.draw, (context,), "WINDOW", "POST_VIEW"
+            self._guide.draw, (context,), "WINDOW", "POST_VIEW"
         )
-
         context.window_manager.modal_handler_add(self)
         context.area.tag_redraw()
         return {"RUNNING_MODAL"}
 
     def modal(self, context, event):
         context.area.tag_redraw()
+        dup = addon.pref().tools.duplicate
+
+        if event.type in {"X", "Y", "Z"} and event.value == "PRESS":
+            attr = f"axis_{event.type.lower()}"
+            setattr(dup, attr, not getattr(dup, attr))
+            return {"RUNNING_MODAL"}
+
+        if event.type == "O" and event.value == "PRESS":
+            cur = _ORIENTATION_CYCLE.index(dup.snap.orientation)
+            dup.snap.orientation = _ORIENTATION_CYCLE[(cur + 1) % len(_ORIENTATION_CYCLE)]
+            return {"RUNNING_MODAL"}
+
+        if event.type == "P" and event.value == "PRESS":
+            cur = _PIVOT_CYCLE.index(dup.snap.pivot)
+            dup.snap.pivot = _PIVOT_CYCLE[(cur + 1) % len(_PIVOT_CYCLE)]
+            return {"RUNNING_MODAL"}
 
         if event.type == "MOUSEMOVE":
-            snap_point = self._get_snap_point(context, event)
-            if snap_point:
-                self.guide.update(self.origin, snap_point)
+            point = self._snap(context, event)
+            if point:
+                rot = self._local_rot if dup.snap.orientation == "LOCAL" else None
+                self._guide.update(
+                    self._origin, point,
+                    axis_x=dup.axis_x, axis_y=dup.axis_y, axis_z=dup.axis_z,
+                    orientation=rot,
+                )
 
         if event.type in {"RIGHTMOUSE", "ESC"}:
             self._cleanup(context)
@@ -251,31 +328,21 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
 
         return {"RUNNING_MODAL"}
 
-    def _get_snap_point(self, context, event):
+    def _snap(self, context, event):
         region = context.region
         rv3d = context.region_data
-        mouse_pos = Vector((event.mouse_region_x, event.mouse_region_y))
-        snap = addon.pref().tools.duplicate.snap
+        mouse = Vector((event.mouse_region_x, event.mouse_region_y))
 
-        point = None
-        match snap:
-            case "ORIGIN":
-                point = _snap_origin(context, mouse_pos, self.exclude)
-            case "FACE":
-                point = _snap_face(context, mouse_pos, self.exclude)
-            case "VERTEX":
-                point = _snap_vertex(context, mouse_pos, self.exclude)
-            case "EDGE":
-                point = _snap_edge(context, mouse_pos, self.exclude)
-            case "EDGE_CENTER":
-                point = _snap_edge_center(context, mouse_pos, self.exclude)
-            case "FACE_CENTER":
-                point = _snap_face_center(context, mouse_pos, self.exclude)
+        snap_fn = _SNAP_FUNCTIONS.get(addon.pref().tools.duplicate.snap.pivot)
+        point = snap_fn(context, mouse, self._exclude) if snap_fn else None
 
-        # Fall back to view projection when no hit
+        # Raycast may deselect objects — restore selection
+        for obj in self._selection:
+            if not obj.select_get():
+                obj.select_set(True)
+
         if point is None:
-            point = _snap_view(self.origin, region, rv3d, mouse_pos)
-
+            point = _snap_view(self._origin, region, rv3d, mouse)
         return point
 
     def _cleanup(self, context):
