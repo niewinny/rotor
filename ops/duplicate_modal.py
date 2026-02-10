@@ -203,6 +203,7 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
         self._origin = obj.matrix_world.translation.copy()
         self._origins = [o.matrix_world.translation.copy() for o in self._selection]
         self._local_rot = obj.matrix_world.to_3x3().normalized()
+        self._last_point = None
         self._guide = handle.Guide()
         self._guide.create(context)
         self._ghost = handle.Ghost()
@@ -253,6 +254,7 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
         if event.type == "MOUSEMOVE":
             point = self._snap(context, event)
             if point:
+                self._last_point = point
                 rot = self._local_rot if dup.snap.orientation == "LOCAL" else None
                 self._guide.callback.update(
                     self._origin, point,
@@ -267,8 +269,9 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
             self._cancel(context)
             return {"CANCELLED"}
 
-        if event.type == "LEFTMOUSE" and event.value == "PRESS":
-            self._cancel(context)
+        if ((event.type == "LEFTMOUSE" and event.value == "RELEASE")
+                or (event.type in {"SPACE", "RET"} and event.value == "PRESS")):
+            self._finish(context)
             return {"FINISHED"}
 
         return {"RUNNING_MODAL"}
@@ -290,14 +293,10 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
             point = _snap_view(self._origin, region, rv3d, mouse)
         return point
 
-    def _ghost_positions(self, point, dup):
-        """Compute ghost placements (position, scale) subdivided by count."""
-        count = dup.count
-        scale = dup.scale
+    def _ghost_offsets(self, point, dup):
+        """Compute direction offsets from grabbed object's origin."""
         diff = point - self._origin
         any_axis = dup.axis_x or dup.axis_y or dup.axis_z
-
-        # Compute offsets relative to grabbed object's origin
         offsets = []
         if not any_axis:
             offsets.append(diff)
@@ -308,8 +307,13 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
                     continue
                 d = r @ AXIS_DATA[name][0]
                 offsets.append(d * 2.0 * diff.dot(d))
+        return offsets
 
-        # Apply subdivided offsets from each selected object's origin
+    def _ghost_positions(self, point, dup):
+        """Compute ghost placements (position, scale) subdivided by count."""
+        count = dup.count
+        scale = dup.scale
+        offsets = self._ghost_offsets(point, dup)
         placements = []
         for org in self._origins:
             for offset in offsets:
@@ -318,6 +322,46 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
                     s = 1.0 + (scale - 1.0) * t
                     placements.append((org + offset * t, s))
         return placements
+
+    def _finish(self, context):
+        """Create real duplicates at ghost positions, then clean up."""
+        self._guide.remove()
+        self._ghost.remove()
+        if not self._last_point:
+            context.area.tag_redraw()
+            return
+
+        dup = addon.pref().tools.duplicate
+        count = dup.count
+        scale = dup.scale
+        offsets = self._ghost_offsets(self._last_point, dup)
+
+        new_objects = []
+        for obj in self._selection:
+            org = obj.matrix_world.translation
+            for offset in offsets:
+                for i in range(1, count + 1):
+                    t = i / count
+                    s = 1.0 + (scale - 1.0) * t
+                    pos = org + offset * t
+
+                    new_obj = obj.copy()
+                    new_obj.data = obj.data.copy()
+                    for col in obj.users_collection:
+                        col.objects.link(new_obj)
+                    new_obj.location = pos
+                    new_obj.scale = obj.scale * s
+                    new_objects.append(new_obj)
+
+        # Select only the new objects
+        for obj in self._selection:
+            obj.select_set(False)
+        for obj in new_objects:
+            obj.select_set(True)
+        if new_objects:
+            context.view_layer.objects.active = new_objects[0]
+
+        context.area.tag_redraw()
 
     def _cancel(self, context):
         self._guide.remove()
