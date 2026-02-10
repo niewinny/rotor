@@ -222,6 +222,12 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
             setattr(dup, attr, not getattr(dup, attr))
             return {"RUNNING_MODAL"}
 
+        if event.type == "N" and event.value == "PRESS":
+            dup.axis_x = False
+            dup.axis_y = False
+            dup.axis_z = False
+            return {"RUNNING_MODAL"}
+
         if event.type == "O" and event.value == "PRESS":
             cur = _ORIENTATION_CYCLE.index(dup.snap.orientation)
             dup.snap.orientation = _ORIENTATION_CYCLE[(cur + 1) % len(_ORIENTATION_CYCLE)]
