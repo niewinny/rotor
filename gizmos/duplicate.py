@@ -9,7 +9,7 @@ class ROTOR_GGT_DuplicateGizmoGroup(bpy.types.GizmoGroup):
     bl_label = "Rotor Duplicate Gizmo"
     bl_space_type = "VIEW_3D"
     bl_region_type = "WINDOW"
-    bl_options = {"3D", "SHOW_MODAL_ALL"}
+    bl_options = {"3D", "SHOW_MODAL_ALL", "PERSISTENT"}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -20,16 +20,19 @@ class ROTOR_GGT_DuplicateGizmoGroup(bpy.types.GizmoGroup):
         active_tool = context.workspace.tools.from_space_view3d_mode(
             context.mode, create=False
         )
-        selected_objects = [
-            obj for obj in context.selected_objects if obj.type == "MESH"
-        ]
         return bool(
             active_tool
             and active_tool.idname == "rotor.duplicate_tool"
-            and selected_objects
         )
 
     def setup(self, context):
+        self._rebuild_gizmos(context)
+
+    def refresh(self, context):
+        self._rebuild_gizmos(context)
+
+    def _rebuild_gizmos(self, context):
+        self.gizmos.clear()
         self.gizmos_list.clear()
         for obj in context.selected_objects:
             if obj.type != "MESH":
