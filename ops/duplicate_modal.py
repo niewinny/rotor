@@ -192,6 +192,38 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
         name="Object",
         description="Name of the object to duplicate",
     )
+    count: bpy.props.IntProperty(
+        name="Count",
+        description="Number of duplicates",
+        default=1,
+        min=1,
+    )
+    dup_scale: bpy.props.FloatProperty(
+        name="Scale",
+        description="Scale factor for duplicates",
+        default=1.0,
+        min=0.01,
+        max=10.0,
+    )
+    location: bpy.props.FloatVectorProperty(
+        name="Location",
+        description="Target placement point",
+        subtype="XYZ",
+    )
+    mode: bpy.props.EnumProperty(
+        name="Mode",
+        items=[("LINEAR", "Linear", ""), ("CIRCLE", "Circle", "")],
+        default="LINEAR",
+    )
+    axis_x: bpy.props.BoolProperty(name="X")
+    axis_y: bpy.props.BoolProperty(name="Y")
+    axis_z: bpy.props.BoolProperty(name="Z")
+    double: bpy.props.BoolProperty(name="Double")
+    orientation: bpy.props.EnumProperty(
+        name="Orientation",
+        items=[("GLOBAL", "Global", ""), ("LOCAL", "Local", "")],
+        default="GLOBAL",
+    )
 
     def invoke(self, context, event):
         obj = bpy.data.objects.get(self.object_name) if self.object_name else None
@@ -442,8 +474,20 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
                         placements.append((org + offset * t, s))
         return placements
 
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = True
+        layout.prop(self, "count")
+        layout.prop(self, "dup_scale")
+        col = layout.column(align=True)
+        col.prop(self, "location")
+
+    def execute(self, context):
+        self._create_duplicates(context)
+        return {"FINISHED"}
+
     def _finish(self, context):
-        """Create real duplicates at ghost positions, then clean up."""
+        """Copy modal state to operator properties, clean up, create duplicates."""
         infobar.remove(context)
         self._guide.remove()
         self._ghost.remove()
@@ -452,16 +496,55 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
             return
 
         dup = addon.pref().tools.duplicate
-        count = dup.count
-        scale = dup.scale
-        is_circle = dup.mode == "CIRCLE"
+        self.count = dup.count
+        self.dup_scale = dup.scale
+        self.location = self._last_point
+        self.mode = dup.mode
+        self.axis_x = dup.axis_x
+        self.axis_y = dup.axis_y
+        self.axis_z = dup.axis_z
+        self.double = dup.double
+        self.orientation = dup.snap.orientation
+
+        self._create_duplicates(context)
+        context.area.tag_redraw()
+
+    def _create_duplicates(self, context):
+        """Create duplicate objects using operator properties."""
+        obj = bpy.data.objects.get(self.object_name) if self.object_name else context.active_object
+        if not obj:
+            return
+
+        selection = list(context.selected_objects)
+        if not selection:
+            selection = [obj]
+
+        origin = obj.matrix_world.translation.copy()
+        local_rot = obj.matrix_world.to_3x3().normalized()
+        point = Vector(self.location)
+        count = self.count
+        scale = self.dup_scale
+        is_circle = self.mode == "CIRCLE"
+        any_axis = self.axis_x or self.axis_y or self.axis_z
 
         new_objects = []
         if is_circle:
-            diff = self._last_point - self._origin
-            rot_axes = self._circle_axes(dup, context)
-            for obj in self._selection:
-                org = obj.matrix_world.translation
+            diff = point - origin
+            if not any_axis:
+                rv3d = context.region_data
+                if rv3d:
+                    rot_axes = [-rv3d.view_matrix.inverted().col[2].to_3d().normalized()]
+                else:
+                    rot_axes = [Vector((0, 0, 1))]
+            else:
+                r = local_rot if self.orientation == "LOCAL" else Matrix.Identity(3)
+                rot_axes = []
+                for name, enabled in [("x", self.axis_x), ("y", self.axis_y), ("z", self.axis_z)]:
+                    if enabled:
+                        rot_axes.append(r @ AXIS_DATA[name][0])
+
+            for sel_obj in selection:
+                org = sel_obj.matrix_world.translation
                 center = org + diff
                 radius = -diff
                 for axis in rot_axes:
@@ -470,40 +553,48 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
                         rot = Matrix.Rotation(angle, 3, axis)
                         pos = center + rot @ radius
 
-                        new_obj = obj.copy()
-                        new_obj.data = obj.data.copy()
-                        for col in obj.users_collection:
+                        new_obj = sel_obj.copy()
+                        new_obj.data = sel_obj.data.copy()
+                        for col in sel_obj.users_collection:
                             col.objects.link(new_obj)
                         new_obj.location = pos
-                        new_obj.scale = obj.scale * scale
+                        new_obj.scale = sel_obj.scale * scale
                         new_objects.append(new_obj)
         else:
-            offsets = self._ghost_offsets(self._last_point, dup)
-            for obj in self._selection:
-                org = obj.matrix_world.translation
+            diff = point - origin
+            factor = 2.0 if self.double else 1.0
+            offsets = []
+            if not any_axis:
+                offsets.append(diff * factor)
+            else:
+                r = local_rot if self.orientation == "LOCAL" else Matrix.Identity(3)
+                for name, enabled in [("x", self.axis_x), ("y", self.axis_y), ("z", self.axis_z)]:
+                    if enabled:
+                        d = r @ AXIS_DATA[name][0]
+                        offsets.append(d * factor * diff.dot(d))
+
+            for sel_obj in selection:
+                org = sel_obj.matrix_world.translation
                 for offset in offsets:
                     for i in range(1, count + 1):
                         t = i / count
                         s = 1.0 + (scale - 1.0) * t
                         pos = org + offset * t
 
-                        new_obj = obj.copy()
-                        new_obj.data = obj.data.copy()
-                        for col in obj.users_collection:
+                        new_obj = sel_obj.copy()
+                        new_obj.data = sel_obj.data.copy()
+                        for col in sel_obj.users_collection:
                             col.objects.link(new_obj)
                         new_obj.location = pos
-                        new_obj.scale = obj.scale * s
+                        new_obj.scale = sel_obj.scale * s
                         new_objects.append(new_obj)
 
-        # Select only the new objects
-        for obj in self._selection:
-            obj.select_set(False)
-        for obj in new_objects:
-            obj.select_set(True)
+        for sel_obj in selection:
+            sel_obj.select_set(False)
+        for new_obj in new_objects:
+            new_obj.select_set(True)
         if new_objects:
             context.view_layer.objects.active = new_objects[0]
-
-        context.area.tag_redraw()
 
     def _cancel(self, context):
         infobar.remove(context)
