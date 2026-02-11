@@ -5,7 +5,7 @@ from mathutils import Matrix, Vector
 from mathutils.geometry import intersect_line_plane
 from bpy_extras.view3d_utils import region_2d_to_origin_3d, region_2d_to_vector_3d
 
-from ..utils import addon
+from ..utils import addon, infobar
 from ..utils.operator import safe
 from ..utils.scene import ray_cast
 from ..shaders import handle
@@ -211,6 +211,7 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
         self._guide.create(context)
         self._ghost = handle.Ghost()
         self._ghost.create(context, obj)
+        infobar.draw(context, event, self._infobar, blank=True)
         context.window_manager.modal_handler_add(self)
         context.area.tag_redraw()
         return {"RUNNING_MODAL"}
@@ -218,6 +219,7 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
     @safe
     def modal(self, context, event):
         context.area.tag_redraw()
+        infobar.draw(context, event, self._infobar, blank=True)
         dup = addon.pref().tools.duplicate
 
         if event.type in {"X", "Y", "Z"} and event.value == "PRESS":
@@ -296,6 +298,35 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
             return {"FINISHED"}
 
         return {"RUNNING_MODAL"}
+
+    def _infobar(self, layout, context, event):
+        """Draw the infobar hotkeys for the duplicate modal."""
+        factor = 4.0
+        row = layout.row(align=True)
+
+        row.label(text="", icon="MOUSE_MOVE")
+        row.label(text="Place")
+        row.separator(factor=factor)
+        row.label(text="Confirm", icon="MOUSE_LMB")
+        row.separator(factor=factor)
+        row.label(text="Cancel", icon="MOUSE_RMB")
+        row.separator(factor=factor)
+        row.label(text="Mode", icon="EVENT_C")
+        row.separator(factor=factor)
+        row.label(text="Axis", icon="EVENT_X")
+        row.separator(factor=factor)
+        row.label(text="Clear Axis", icon="EVENT_N")
+        row.separator(factor=factor)
+        row.label(text="[ ]  Count")
+        row.separator(factor=factor)
+        row.label(text="; '  Scale")
+        row.separator(factor=factor)
+        row.label(text="Orientation", icon="EVENT_O")
+        row.separator(factor=factor)
+        row.label(text="Snap", icon="EVENT_P")
+        row.separator(factor=factor)
+        row.label(text="Double", icon="EVENT_D")
+        row.separator(factor=factor)
 
     def _snap(self, context, event):
         region = context.region
@@ -413,6 +444,7 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
 
     def _finish(self, context):
         """Create real duplicates at ghost positions, then clean up."""
+        infobar.remove(context)
         self._guide.remove()
         self._ghost.remove()
         if not self._last_point:
@@ -474,6 +506,7 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
         context.area.tag_redraw()
 
     def _cancel(self, context):
+        infobar.remove(context)
         self._guide.remove()
         self._ghost.remove()
         context.area.tag_redraw()
