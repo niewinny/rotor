@@ -253,6 +253,7 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
         context.area.tag_redraw()
         infobar.draw(context, event, self._infobar, blank=True)
         dup = addon.pref().tools.duplicate
+        self._update_header(context, dup)
 
         if event.type in {"X", "Y", "Z"} and event.value == "PRESS":
             attr = f"axis_{event.type.lower()}"
@@ -359,6 +360,30 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
         row.separator(factor=factor)
         row.label(text="Double", icon="EVENT_D")
         row.separator(factor=factor)
+
+    def _update_header(self, context, dup):
+        """Update the header with live values."""
+        axes = []
+        if dup.axis_x:
+            axes.append("X")
+        if dup.axis_y:
+            axes.append("Y")
+        if dup.axis_z:
+            axes.append("Z")
+        axis_text = ", ".join(axes) if axes else "Free"
+
+        parts = [
+            f"Mode: {dup.mode.capitalize()}",
+            f"Count: {dup.count}",
+            f"Scale: {dup.scale:.2f}",
+            f"Axis: {axis_text}",
+            f"Orientation: {dup.snap.orientation.capitalize()}",
+            f"Snap: {dup.snap.pivot.replace('_', ' ').capitalize()}",
+        ]
+        if dup.mode == "LINEAR" and dup.double:
+            parts.append("Double: On")
+
+        context.area.header_text_set(text="    ".join(parts))
 
     def _snap(self, context, event):
         region = context.region
@@ -488,6 +513,7 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
 
     def _finish(self, context):
         """Copy modal state to operator properties, clean up, create duplicates."""
+        context.area.header_text_set(text=None)
         infobar.remove(context)
         self._guide.remove()
         self._ghost.remove()
@@ -597,6 +623,7 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
             context.view_layer.objects.active = new_objects[0]
 
     def _cancel(self, context):
+        context.area.header_text_set(text=None)
         infobar.remove(context)
         self._guide.remove()
         self._ghost.remove()
