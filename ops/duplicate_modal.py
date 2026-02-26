@@ -256,75 +256,71 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
         dup = addon.pref().tools.duplicate
         self._update_header(context, dup)
 
+        changed = False
+
         if event.type in {"X", "Y", "Z"} and event.value == "PRESS":
             attr = f"axis_{event.type.lower()}"
             setattr(dup, attr, not getattr(dup, attr))
-            return {"RUNNING_MODAL"}
+            changed = True
 
-        if event.type == "N" and event.value == "PRESS":
+        elif event.type == "N" and event.value == "PRESS":
             dup.axis_x = False
             dup.axis_y = False
             dup.axis_z = False
-            return {"RUNNING_MODAL"}
+            changed = True
 
-        if event.type == "C" and event.value == "PRESS":
+        elif event.type == "C" and event.value == "PRESS":
             cur = _MODE_CYCLE.index(dup.mode)
             dup.mode = _MODE_CYCLE[(cur + 1) % len(_MODE_CYCLE)]
-            return {"RUNNING_MODAL"}
+            changed = True
 
-        if event.type == "O" and event.value == "PRESS":
+        elif event.type == "O" and event.value == "PRESS":
             cur = _ORIENTATION_CYCLE.index(dup.snap.orientation)
             dup.snap.orientation = _ORIENTATION_CYCLE[(cur + 1) % len(_ORIENTATION_CYCLE)]
-            return {"RUNNING_MODAL"}
+            changed = True
 
-        if event.type == "P" and event.value == "PRESS":
+        elif event.type == "P" and event.value == "PRESS":
             cur = _PIVOT_CYCLE.index(dup.snap.pivot)
             dup.snap.pivot = _PIVOT_CYCLE[(cur + 1) % len(_PIVOT_CYCLE)]
-            return {"RUNNING_MODAL"}
+            changed = True
 
-        if event.type == "RIGHT_BRACKET" and event.value == "PRESS":
+        elif event.type in {"RIGHT_BRACKET", "WHEELUPMOUSE"} and event.value == "PRESS":
             dup.count += 1
-            return {"RUNNING_MODAL"}
+            changed = True
 
-        if event.type == "LEFT_BRACKET" and event.value == "PRESS":
+        elif event.type in {"LEFT_BRACKET", "WHEELDOWNMOUSE"} and event.value == "PRESS":
             if dup.count > 1:
                 dup.count -= 1
-            return {"RUNNING_MODAL"}
+                changed = True
 
-        if event.type == "QUOTE" and event.value == "PRESS":
+        elif event.type == "QUOTE" and event.value == "PRESS":
             step = 0.01 if event.shift else 0.1
             dup.scale = round(dup.scale + step, 2)
-            return {"RUNNING_MODAL"}
+            changed = True
 
-        if event.type == "SEMI_COLON" and event.value == "PRESS":
+        elif event.type == "SEMI_COLON" and event.value == "PRESS":
             step = 0.01 if event.shift else 0.1
             dup.scale = max(0.01, round(dup.scale - step, 2))
-            return {"RUNNING_MODAL"}
+            changed = True
 
-        if event.type == "D" and event.value == "PRESS":
+        elif event.type == "D" and event.value == "PRESS":
             dup.double = not dup.double
-            return {"RUNNING_MODAL"}
+            changed = True
 
-        if event.type == "A" and event.value == "PRESS":
+        elif event.type == "A" and event.value == "PRESS":
             dup.align = not dup.align
+            changed = True
+
+        if changed:
+            if self._last_point:
+                self._update_preview(context, dup, self._last_point)
             return {"RUNNING_MODAL"}
 
         if event.type == "MOUSEMOVE":
             point = self._snap(context, event)
             if point:
                 self._last_point = point
-                rot = self._local_rot if dup.snap.orientation == "LOCAL" else None
-                is_circle = dup.mode == "CIRCLE"
-                self._guide.callback.update(
-                    self._origin, point,
-                    axis_x=dup.axis_x, axis_y=dup.axis_y, axis_z=dup.axis_z,
-                    orientation=rot,
-                    double=dup.double and not is_circle,
-                    circle=is_circle,
-                )
-                self._ghost.callback.update(
-                    self._ghost_positions(point, dup, context)
-                )
+                self._update_preview(context, dup, point)
 
         if event.type in {"RIGHTMOUSE", "ESC"}:
             self._cancel(context)
@@ -393,6 +389,21 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
             parts.append("Align: On")
 
         context.area.header_text_set(text="    ".join(parts))
+
+    def _update_preview(self, context, dup, point):
+        """Refresh guide and ghost preview for the given point."""
+        rot = self._local_rot if dup.snap.orientation == "LOCAL" else None
+        is_circle = dup.mode == "CIRCLE"
+        self._guide.callback.update(
+            self._origin, point,
+            axis_x=dup.axis_x, axis_y=dup.axis_y, axis_z=dup.axis_z,
+            orientation=rot,
+            double=dup.double and not is_circle,
+            circle=is_circle,
+        )
+        self._ghost.callback.update(
+            self._ghost_positions(point, dup, context)
+        )
 
     def _snap(self, context, event):
         region = context.region
