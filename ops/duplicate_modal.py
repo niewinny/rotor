@@ -219,6 +219,7 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
     axis_y: bpy.props.BoolProperty(name="Y")
     axis_z: bpy.props.BoolProperty(name="Z")
     double: bpy.props.BoolProperty(name="Double")
+    align: bpy.props.BoolProperty(name="Align")
     orientation: bpy.props.EnumProperty(
         name="Orientation",
         items=[("GLOBAL", "Global", ""), ("LOCAL", "Local", "")],
@@ -304,6 +305,10 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
             dup.double = not dup.double
             return {"RUNNING_MODAL"}
 
+        if event.type == "A" and event.value == "PRESS":
+            dup.align = not dup.align
+            return {"RUNNING_MODAL"}
+
         if event.type == "MOUSEMOVE":
             point = self._snap(context, event)
             if point:
@@ -360,6 +365,8 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
         row.separator(factor=factor)
         row.label(text="Double", icon="EVENT_D")
         row.separator(factor=factor)
+        row.label(text="Align", icon="EVENT_A")
+        row.separator(factor=factor)
 
     def _update_header(self, context, dup):
         """Update the header with live values."""
@@ -382,6 +389,8 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
         ]
         if dup.mode == "LINEAR" and dup.double:
             parts.append("Double: On")
+        if dup.mode == "CIRCLE" and dup.align:
+            parts.append("Align: On")
 
         context.area.header_text_set(text="    ".join(parts))
 
@@ -472,10 +481,29 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
             axes.append(r @ AXIS_DATA[name][0])
         return axes
 
+    @staticmethod
+    def _apply_circle_align(obj, angle, axis):
+        """Rotate obj by *angle* around *axis*, composing with its current rotation."""
+        circle_quat = Matrix.Rotation(angle, 3, axis).to_quaternion()
+        mode = obj.rotation_mode
+        if mode == 'QUATERNION':
+            obj.rotation_quaternion = circle_quat @ obj.rotation_quaternion
+        elif mode == 'AXIS_ANGLE':
+            aa = obj.rotation_axis_angle
+            base = Matrix.Rotation(aa[0], 3, Vector(aa[1:])).to_quaternion()
+            result = circle_quat @ base
+            ax, ang = result.to_axis_angle()
+            obj.rotation_axis_angle = (ang, *ax)
+        else:
+            base = obj.rotation_euler.to_quaternion()
+            result = circle_quat @ base
+            obj.rotation_euler = result.to_euler(mode)
+
     def _ghost_positions(self, point, dup, context):
-        """Compute ghost placements (position, scale) for current mode."""
+        """Compute ghost placements (position, scale, rotation) for current mode."""
         count = dup.count
         scale = dup.scale
+        align = dup.align
         placements = []
 
         if dup.mode == "CIRCLE":
@@ -488,15 +516,19 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
                     for i in range(1, count + 1):
                         angle = 2 * pi * i / (count + 1)
                         rot = Matrix.Rotation(angle, 3, axis)
-                        placements.append((center + rot @ radius, scale))
+                        pos = center + rot @ radius
+                        ghost_rot = rot if align else None
+                        placements.append((pos, scale, ghost_rot))
         else:
             offsets = self._ghost_offsets(point, dup)
+            any_axis = dup.axis_x or dup.axis_y or dup.axis_z
             for org in self._origins:
                 for offset in offsets:
                     for i in range(1, count + 1):
                         t = i / count
                         s = 1.0 + (scale - 1.0) * t
-                        placements.append((org + offset * t, s))
+                        pos = org + offset * t
+                        placements.append((pos, s, None))
         return placements
 
     def draw(self, context):
@@ -504,6 +536,7 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
         layout.use_property_split = True
         layout.prop(self, "count")
         layout.prop(self, "dup_scale")
+        layout.prop(self, "align")
         col = layout.column(align=True)
         col.prop(self, "location")
 
@@ -530,6 +563,7 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
         self.axis_y = dup.axis_y
         self.axis_z = dup.axis_z
         self.double = dup.double
+        self.align = dup.align
         self.orientation = dup.snap.orientation
 
         self._create_duplicates(context)
@@ -585,6 +619,8 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
                             col.objects.link(new_obj)
                         new_obj.location = pos
                         new_obj.scale = sel_obj.scale * scale
+                        if self.align:
+                            self._apply_circle_align(new_obj, angle, axis)
                         new_objects.append(new_obj)
         else:
             diff = point - origin

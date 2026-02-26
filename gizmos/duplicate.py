@@ -39,10 +39,11 @@ class ROTOR_GGT_DuplicateGizmoGroup(bpy.types.GizmoGroup):
                 continue
             gz = self.gizmos.new("GIZMO_GT_move_3d")
             gz.draw_style = "RING_2D"
-            gz.color = (0.8, 0.8, 0.8)
-            gz.alpha = 0.5
-            gz.color_highlight = (1.0, 1.0, 1.0)
-            gz.alpha_highlight = 0.8
+            gz.color = (0.0, 0.75, 0.75)
+            gz.alpha = 0.8
+            gz.color_highlight = (0.0, 1.0, 1.0)
+            gz.alpha_highlight = 1.0
+            gz.line_width = 3.0
             gz.scale_basis = 0.15
             gz.use_draw_modal = False
             mat = Matrix.Identity(4)
