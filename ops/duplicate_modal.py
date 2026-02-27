@@ -180,6 +180,106 @@ _MODE_CYCLE = ("LINEAR", "CIRCLE")
 _PIVOT_CYCLE = ("INCREMENT", "GRID", "ORIGIN", "FACE", "VERTEX", "EDGE", "EDGE_CENTER", "FACE_CENTER")
 _ORIENTATION_CYCLE = ("GLOBAL", "LOCAL")
 
+def _is_object_pointer(prop):
+    """Return True if *prop* is a writable pointer to bpy.types.Object."""
+    if prop.type != 'POINTER' or prop.is_readonly or not prop.fixed_type:
+        return False
+    return prop.fixed_type.bl_rna == bpy.types.Object.bl_rna
+
+
+def _is_id_type(rna_struct):
+    """Return True if *rna_struct* inherits from bpy.types.ID."""
+    cur = rna_struct
+    while cur:
+        if cur.identifier == 'ID':
+            return True
+        cur = cur.base
+    return False
+
+
+def _swap_object_pointers(data, old_to_new):
+    """Replace Object references on *data* via RNA and ID properties."""
+    for prop in data.bl_rna.properties:
+        if not _is_object_pointer(prop):
+            continue
+        ref = getattr(data, prop.identifier, None)
+        if ref and ref in old_to_new:
+            try:
+                setattr(data, prop.identifier, old_to_new[ref])
+            except Exception:
+                pass
+    try:
+        for key in data.keys():
+            try:
+                val = data[key]
+            except Exception:
+                continue
+            if isinstance(val, bpy.types.Object) and val in old_to_new:
+                try:
+                    data[key] = old_to_new[val]
+                except Exception:
+                    pass
+    except (AttributeError, TypeError):
+        pass
+
+
+def _walk_and_swap(data, old_to_new, visited):
+    """Recurse into non-ID sub-properties of *data* and swap Object refs."""
+    try:
+        key = data.as_pointer()
+    except (AttributeError, RuntimeError):
+        return
+    if key in visited:
+        return
+    visited.add(key)
+
+    _swap_object_pointers(data, old_to_new)
+
+    for prop in data.bl_rna.properties:
+        if prop.identifier == 'rna_type':
+            continue
+        if prop.type == 'POINTER' and prop.fixed_type:
+            if prop.fixed_type.bl_rna == bpy.types.Object.bl_rna:
+                continue
+            if _is_id_type(prop.fixed_type.bl_rna):
+                continue
+            try:
+                sub = getattr(data, prop.identifier)
+                if sub is not None and hasattr(sub, 'bl_rna'):
+                    _walk_and_swap(sub, old_to_new, visited)
+            except Exception:
+                pass
+        elif prop.type == 'COLLECTION':
+            try:
+                for item in getattr(data, prop.identifier):
+                    if hasattr(item, 'bl_rna'):
+                        _walk_and_swap(item, old_to_new, visited)
+            except Exception:
+                pass
+
+
+def _remap_references(copies, selection, context):
+    """Remap inter-object references so duplicates point to each other."""
+    if not copies:
+        return
+    from collections import defaultdict
+    instances = defaultdict(list)
+    for src, new, idx in copies:
+        instances[idx].append((src, new))
+
+    context.view_layer.update()
+
+    for instance_copies in instances.values():
+        old_to_new = {src: new for src, new in instance_copies}
+        for src, new_obj in instance_copies:
+            if src.parent and src.parent in old_to_new:
+                new_parent = old_to_new[src.parent]
+                new_obj.parent = new_parent
+                new_obj.matrix_parent_inverse = (
+                    new_parent.matrix_world.inverted()
+                )
+            _walk_and_swap(new_obj, old_to_new, set())
+
 
 class ROTOR_OT_DuplicateModal(bpy.types.Operator):
     """Duplicate object with visual guide"""
@@ -597,8 +697,10 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
         scale = self.dup_scale
         is_circle = self.mode == "CIRCLE"
         any_axis = self.axis_x or self.axis_y or self.axis_z
+        sel_set = set(selection)
 
         new_objects = []
+        copies = []
         if is_circle:
             diff = point - origin
             if not any_axis:
@@ -618,7 +720,7 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
                 org = sel_obj.matrix_world.translation
                 center = org + diff
                 radius = -diff
-                for axis in rot_axes:
+                for axis_idx, axis in enumerate(rot_axes):
                     for i in range(1, count + 1):
                         angle = 2 * pi * i / (count + 1)
                         rot = Matrix.Rotation(angle, 3, axis)
@@ -626,6 +728,8 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
 
                         new_obj = sel_obj.copy()
                         new_obj.data = sel_obj.data.copy()
+                        if sel_obj.parent and sel_obj.parent in sel_set:
+                            new_obj.parent = None
                         for col in sel_obj.users_collection:
                             col.objects.link(new_obj)
                         new_obj.location = pos
@@ -633,6 +737,7 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
                         if self.align:
                             self._apply_circle_align(new_obj, angle, axis)
                         new_objects.append(new_obj)
+                        copies.append((sel_obj, new_obj, axis_idx * count + i - 1))
         else:
             diff = point - origin
             factor = 2.0 if self.double else 1.0
@@ -648,7 +753,7 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
 
             for sel_obj in selection:
                 org = sel_obj.matrix_world.translation
-                for offset in offsets:
+                for offset_idx, offset in enumerate(offsets):
                     for i in range(1, count + 1):
                         t = i / count
                         s = 1.0 + (scale - 1.0) * t
@@ -656,11 +761,16 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
 
                         new_obj = sel_obj.copy()
                         new_obj.data = sel_obj.data.copy()
+                        if sel_obj.parent and sel_obj.parent in sel_set:
+                            new_obj.parent = None
                         for col in sel_obj.users_collection:
                             col.objects.link(new_obj)
                         new_obj.location = pos
                         new_obj.scale = sel_obj.scale * s
                         new_objects.append(new_obj)
+                        copies.append((sel_obj, new_obj, offset_idx * count + i - 1))
+
+        _remap_references(copies, selection, context)
 
         for sel_obj in selection:
             sel_obj.select_set(False)
