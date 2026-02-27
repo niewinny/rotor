@@ -78,6 +78,11 @@ class Duplicate(bpy.types.PropertyGroup):
         soft_min=0.1,
         soft_max=10.0,
     )
+    align: bpy.props.BoolProperty(
+        name="Align",
+        description="Orient all objects (including selected) to face the cursor",
+        default=False,
+    )
     snap: bpy.props.PointerProperty(type=DuplicateSnap)
 
 

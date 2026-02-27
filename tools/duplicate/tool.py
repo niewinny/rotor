@@ -31,6 +31,7 @@ class ROTOR_MT_Duplicate(bpy.types.WorkSpaceTool):
         row.prop(dup, "axis_z", toggle=True)
         if dup.mode == "LINEAR":
             row.prop(dup, "double", toggle=True)
+        row.prop(dup, "align", toggle=True)
 
         row.separator_spacer()
 

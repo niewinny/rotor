@@ -156,16 +156,20 @@ class GhostDraw(DrawBase):
     def update(self, placements):
         """Rebuild batch with cached edges offset and scaled per placement.
 
-        placements: list of (position, scale) tuples.
+        placements: list of (position, scale, rotation_or_None) tuples.
         """
         if not self._edges or not placements:
             self.batch = None
             return
         vertices = []
-        for pos, scale in placements:
+        for pos, scale, rot in placements:
             for v0_rel, v1_rel in self._edges:
-                vertices.append((v0_rel * scale + pos)[:])
-                vertices.append((v1_rel * scale + pos)[:])
+                if rot:
+                    vertices.append((rot @ (v0_rel * scale) + pos)[:])
+                    vertices.append((rot @ (v1_rel * scale) + pos)[:])
+                else:
+                    vertices.append((v0_rel * scale + pos)[:])
+                    vertices.append((v1_rel * scale + pos)[:])
         self.batch = batch_for_shader(
             self.shader, "LINES", {"pos": vertices},
         )
