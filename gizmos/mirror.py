@@ -172,7 +172,7 @@ class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
         theme_axis = addon.pref().theme.axis
         mirror_tool = addon.pref().tools.mirror
         element = mirror_tool.element
-        gizmo_size = mirror_tool.gizmo_size
+        gizmo_size = addon.pref().tools.gizmo_size
         reverse_controls = mirror_tool.reverse_controls
         hide_collection_gizmos = True if element == "OBJECT" else False
         hide_mirror_gizmos = True if element == "COLLECTION" else False

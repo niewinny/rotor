@@ -77,16 +77,6 @@ class Mirror(bpy.types.PropertyGroup):
         default=True,
     )
 
-    gizmo_size: bpy.props.FloatProperty(
-        name="Gizmo Size",
-        description="Size of the mirror gizmo handles",
-        default=1.0,
-        min=0.1,
-        max=5.0,
-        soft_min=0.5,
-        soft_max=2.0,
-    )
-
     # === Reverse Controls ===
     reverse_controls: bpy.props.BoolProperty(
         name="Reverse Controls",
