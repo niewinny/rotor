@@ -36,19 +36,19 @@ def register():
             after={"object.bout_block_obj"},
         )
         register_tool(
-            tools.duplicate.ROTOR_MT_Duplicate,
+            tools.array.ROTOR_MT_Array,
             group=False,
             separator=False,
-            after={"rotor.mirror_tool"},
+            after={"mirror.mirror_tool"},
         )
     else:
         # Default: use separator
         register_tool(tools.mirror.ROTOR_MT_Mirror, group=True, separator=True)
         register_tool(
-            tools.duplicate.ROTOR_MT_Duplicate,
+            tools.array.ROTOR_MT_Array,
             group=False,
             separator=False,
-            after={"rotor.mirror_tool"},
+            after={"mirror.mirror_tool"},
         )
 
     btypes.register()
@@ -58,7 +58,7 @@ def register():
 def unregister():
     keymap.unregister()
 
-    unregister_tool(tools.duplicate.ROTOR_MT_Duplicate)
+    unregister_tool(tools.array.ROTOR_MT_Array)
     unregister_tool(tools.mirror.ROTOR_MT_Mirror)
 
     for cls in reversed(classes):

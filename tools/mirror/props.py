@@ -59,6 +59,12 @@ class Mirror(bpy.types.PropertyGroup):
         default="LOCAL",
     )
 
+    real: bpy.props.BoolProperty(
+        name="Real",
+        description="Create real duplicated objects instead of mirror modifiers",
+        default=False,
+    )
+
     bisect: bpy.props.BoolProperty(
         name="Bisect",
         description="Bisect the object using specified axis",

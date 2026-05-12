@@ -5,7 +5,7 @@ from . import tools
 
 class Tools(bpy.types.PropertyGroup):
     mirror: bpy.props.PointerProperty(type=tools.mirror.props.Mirror)
-    duplicate: bpy.props.PointerProperty(type=tools.duplicate.props.Duplicate)
+    array: bpy.props.PointerProperty(type=tools.array.props.Array)
 
 
 class Scene(bpy.types.PropertyGroup):

@@ -13,7 +13,7 @@ LINKS = [
 
 
 class ROTOR_OT_OpenURL(bpy.types.Operator):
-    bl_idname = "rotor.open_url"
+    bl_idname = "mirror.open_url"
     bl_label = "Open URL"
     bl_description = "Open URL in browser"
 
@@ -93,7 +93,7 @@ class Rotor_Preference(bpy.types.AddonPreferences):
 
         col.separator()
         for label, url, icon in LINKS:
-            op = col.operator("rotor.open_url", text=label, icon=icon)
+            op = col.operator("mirror.open_url", text=label, icon=icon)
             op.url = url
 
     def theme_layout(self, layout, theme):

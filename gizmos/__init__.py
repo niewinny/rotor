@@ -1,5 +1,5 @@
 from . import mirror
-from . import duplicate
+from . import array
 
 
-classes = (*mirror.classes, *duplicate.classes)
+classes = (*mirror.classes, *array.classes)

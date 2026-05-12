@@ -1,8 +1,9 @@
+import os
 from math import pi
 
 import bpy
 from mathutils import Matrix, Vector
-from mathutils.geometry import intersect_line_plane
+from mathutils.geometry import intersect_line_line, intersect_line_plane
 from bpy_extras.view3d_utils import region_2d_to_origin_3d, region_2d_to_vector_3d
 
 from ..utils import addon, infobar
@@ -180,6 +181,57 @@ _MODE_CYCLE = ("LINEAR", "CIRCLE")
 _PIVOT_CYCLE = ("INCREMENT", "GRID", "ORIGIN", "FACE", "VERTEX", "EDGE", "EDGE_CENTER", "FACE_CENTER")
 _ORIENTATION_CYCLE = ("GLOBAL", "LOCAL")
 
+
+def _compute_circle_axis(axis_x, axis_y, axis_z, orientation, local_rot, context=None):
+    """Return world-space rotation axis for circle mode.
+
+    - 1 axis  → perpendicular to that axis (cross with view), so the
+                 object stays on the circle and the circle contains the axis
+    - 2 axes  → rotate around the disabled axis (normal to the plane)
+    - 0 or 3  → fall back to view normal or world Z
+    """
+    axes_enabled = [axis_x, axis_y, axis_z]
+    num_axes = sum(axes_enabled)
+    if num_axes == 0 or num_axes == 3:
+        if context:
+            rv3d = context.region_data
+            if rv3d:
+                return -rv3d.view_matrix.inverted().col[2].to_3d().normalized()
+        return Vector((0, 0, 1))
+    r = local_rot if orientation == "LOCAL" else Matrix.Identity(3)
+    axis_names = ["x", "y", "z"]
+    if num_axes == 1:
+        idx = axes_enabled.index(True)
+        face = (r @ AXIS_DATA[axis_names[idx]][0]).normalized()
+        if context:
+            rv3d = context.region_data
+            if rv3d:
+                view = -rv3d.view_matrix.inverted().col[2].to_3d().normalized()
+                cross = face.cross(view)
+                if cross.length > 1e-6:
+                    return cross.normalized()
+        return face.orthogonal().normalized()
+    else:
+        idx = axes_enabled.index(False)
+    return (r @ AXIS_DATA[axis_names[idx]][0]).normalized()
+
+
+def _resolve_face_direction(face_axis, orientation, local_rot, rot_axis):
+    """Return world-space facing direction from face_axis enum, projected onto circle plane.
+
+    Returns None if face_axis is "NONE".
+    """
+    if face_axis == "NONE":
+        return None
+    r = local_rot if orientation == "LOCAL" else Matrix.Identity(3)
+    name = face_axis.lower()
+    raw = (r @ AXIS_DATA[name][0]).normalized()
+    projected = raw - rot_axis * raw.dot(rot_axis)
+    if projected.length < 1e-6:
+        return None
+    return projected.normalized()
+
+
 def _is_object_pointer(prop):
     """Return True if *prop* is a writable pointer to bpy.types.Object."""
     if prop.type != 'POINTER' or prop.is_readonly or not prop.fixed_type:
@@ -258,6 +310,62 @@ def _walk_and_swap(data, old_to_new, visited):
                 pass
 
 
+def _get_array_node_group():
+    """Return the essentials Array geometry node group, loading it if needed."""
+    existing = bpy.data.node_groups.get("Array")
+    if existing and existing.type == 'GEOMETRY':
+        return existing
+
+    blend_path = os.path.join(
+        bpy.utils.system_resource('DATAFILES'),
+        "assets", "nodes", "geometry_nodes_essentials.blend",
+    )
+    if not os.path.exists(blend_path):
+        return None
+
+    with bpy.data.libraries.load(blend_path, link=False) as (data_from, data_to):
+        if "Array" not in data_from.node_groups:
+            return None
+        data_to.node_groups = ["Array"]
+    return bpy.data.node_groups.get("Array")
+
+
+def _input_identifier_map(node_group):
+    """Return {socket name: identifier} for INPUT sockets only."""
+    ids = {}
+    for item in node_group.interface.items_tree:
+        if getattr(item, 'item_type', None) != 'SOCKET':
+            continue
+        if getattr(item, 'in_out', None) != 'INPUT':
+            continue
+        ids[item.name] = item.identifier
+    return ids
+
+
+def _set_gn_input(mod, identifier, value):
+    """Set a Geometry Nodes modifier input by socket identifier.
+
+    Uses the Blender 5.2+ ``mod.properties.inputs.<id>.value`` API when
+    available, with a fallback to the older id-property subscript form.
+    """
+    if identifier is None:
+        return
+    props = getattr(mod, "properties", None)
+    if props is not None:
+        socket = getattr(props.inputs, identifier, None)
+        if socket is None:
+            return
+        try:
+            socket.value = value
+        except Exception:
+            pass
+        return
+    try:
+        mod[identifier] = value
+    except (TypeError, KeyError):
+        pass
+
+
 def _remap_references(copies, selection, context):
     """Remap inter-object references so duplicates point to each other."""
     if not copies:
@@ -273,19 +381,15 @@ def _remap_references(copies, selection, context):
         old_to_new = {src: new for src, new in instance_copies}
         for src, new_obj in instance_copies:
             if src.parent and src.parent in old_to_new:
-                new_parent = old_to_new[src.parent]
-                new_obj.parent = new_parent
-                new_obj.matrix_parent_inverse = (
-                    new_parent.matrix_world.inverted()
-                )
+                new_obj.parent = old_to_new[src.parent]
             _walk_and_swap(new_obj, old_to_new, set())
 
 
-class ROTOR_OT_DuplicateModal(bpy.types.Operator):
-    """Duplicate object with visual guide"""
+class ROTOR_OT_ArrayModal(bpy.types.Operator):
+    """Array object with visual guide"""
 
-    bl_idname = "rotor.duplicate_modal"
-    bl_label = "Rotor Duplicate"
+    bl_idname = "mirror.array_modal"
+    bl_label = "Array"
     bl_options = {"REGISTER", "UNDO", "INTERNAL"}
 
     object_name: bpy.props.StringProperty(
@@ -320,6 +424,11 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
     axis_z: bpy.props.BoolProperty(name="Z")
     double: bpy.props.BoolProperty(name="Double")
     align: bpy.props.BoolProperty(name="Align")
+    face_axis: bpy.props.EnumProperty(
+        name="Face",
+        items=[("NONE", "None", ""), ("X", "X", ""), ("Y", "Y", ""), ("Z", "Z", "")],
+        default="NONE",
+    )
     orientation: bpy.props.EnumProperty(
         name="Orientation",
         items=[("GLOBAL", "Global", ""), ("LOCAL", "Local", "")],
@@ -353,14 +462,18 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
     def modal(self, context, event):
         context.area.tag_redraw()
         infobar.draw(context, event, self._infobar, blank=True)
-        dup = addon.pref().tools.duplicate
+        dup = addon.pref().tools.array
         self._update_header(context, dup)
 
         changed = False
 
         if event.type in {"X", "Y", "Z"} and event.value == "PRESS":
-            attr = f"axis_{event.type.lower()}"
-            setattr(dup, attr, not getattr(dup, attr))
+            if event.ctrl:
+                axis = event.type
+                dup.face_axis = "NONE" if dup.face_axis == axis else axis
+            else:
+                attr = f"axis_{event.type.lower()}"
+                setattr(dup, attr, not getattr(dup, attr))
             changed = True
 
         elif event.type == "N" and event.value == "PRESS":
@@ -463,6 +576,8 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
         row.separator(factor=factor)
         row.label(text="Align", icon="EVENT_A")
         row.separator(factor=factor)
+        row.label(text="Ctrl+XYZ  Face Axis")
+        row.separator(factor=factor)
 
     def _update_header(self, context, dup):
         """Update the header with live values."""
@@ -485,8 +600,11 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
         ]
         if dup.mode == "LINEAR" and dup.double:
             parts.append("Double: On")
-        if dup.mode == "CIRCLE" and dup.align:
-            parts.append("Align: On")
+        if dup.mode == "CIRCLE":
+            if dup.align:
+                parts.append("Align: On")
+            face_text = dup.face_axis if dup.face_axis != "NONE" else "Auto"
+            parts.append(f"Face: {face_text}")
 
         context.area.header_text_set(text="    ".join(parts))
 
@@ -494,16 +612,69 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
         """Refresh guide and ghost preview for the given point."""
         rot = self._local_rot if dup.snap.orientation == "LOCAL" else None
         is_circle = dup.mode == "CIRCLE"
+        circle_guide = is_circle
         self._guide.callback.update(
             self._origin, point,
             axis_x=dup.axis_x, axis_y=dup.axis_y, axis_z=dup.axis_z,
             orientation=rot,
             double=dup.double and not is_circle,
-            circle=is_circle,
+            circle=circle_guide,
         )
         self._ghost.callback.update(
             self._ghost_positions(point, dup, context)
         )
+
+    def _snap_to_constraint(self, context, mouse):
+        """Cast cursor ray onto the constraint plane/line defined by enabled axes."""
+        dup = addon.pref().tools.array
+        axes_enabled = [dup.axis_x, dup.axis_y, dup.axis_z]
+        num_axes = sum(axes_enabled)
+        is_circle = dup.mode == "CIRCLE"
+
+        if num_axes == 0 or num_axes == 3:
+            return None  # No constraint or all axes — use view plane
+
+        region = context.region
+        rv3d = context.region_data
+        ray_origin = region_2d_to_origin_3d(region, rv3d, mouse)
+        ray_dir = region_2d_to_vector_3d(region, rv3d, mouse)
+        rot = self._local_rot if dup.snap.orientation == "LOCAL" else Matrix.Identity(3)
+        axis_names = ["x", "y", "z"]
+
+        if is_circle:
+            if num_axes == 1:
+                # 1 axis: constrain cursor along that axis
+                enabled_idx = axes_enabled.index(True)
+                axis_dir = rot @ AXIS_DATA[axis_names[enabled_idx]][0]
+                result = intersect_line_line(
+                    self._origin, self._origin + axis_dir,
+                    ray_origin, ray_origin + ray_dir,
+                )
+                return result[0] if result else None
+            else:
+                # 2 axes: snap to the circle plane
+                disabled_idx = axes_enabled.index(False)
+                normal = rot @ AXIS_DATA[axis_names[disabled_idx]][0]
+                return intersect_line_plane(
+                    ray_origin, ray_origin + ray_dir, self._origin, normal,
+                )
+        else:
+            if num_axes == 2:
+                # Plane constraint: normal is the disabled axis
+                disabled_idx = axes_enabled.index(False)
+                normal = rot @ AXIS_DATA[axis_names[disabled_idx]][0]
+                return intersect_line_plane(
+                    ray_origin, ray_origin + ray_dir, self._origin, normal,
+                )
+            else:
+                # Line constraint: closest point on axis to cursor ray
+                enabled_idx = axes_enabled.index(True)
+                axis_dir = rot @ AXIS_DATA[axis_names[enabled_idx]][0]
+                result = intersect_line_line(
+                    self._origin, self._origin + axis_dir,
+                    ray_origin, ray_origin + ray_dir,
+                )
+                return result[0] if result else None
 
     def _snap(self, context, event):
         region = context.region
@@ -511,7 +682,7 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
         mouse = Vector((event.mouse_region_x, event.mouse_region_y))
 
         use_snap = context.tool_settings.use_snap != event.ctrl
-        pivot = addon.pref().tools.duplicate.snap.pivot
+        pivot = addon.pref().tools.array.snap.pivot
         point = None
 
         if use_snap and pivot not in {"INCREMENT", "GRID"}:
@@ -522,6 +693,9 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
             for obj in self._selection:
                 if not obj.select_get():
                     obj.select_set(True)
+
+        if point is None:
+            point = self._snap_to_constraint(context, mouse)
 
         if point is None:
             point = _snap_view(self._origin, region, rv3d, mouse)
@@ -550,47 +724,43 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
     @staticmethod
     def _snap_grid(context, point):
         """Snap the absolute position to the nearest grid line."""
-        step = ROTOR_OT_DuplicateModal._grid_step(context)
+        step = ROTOR_OT_ArrayModal._grid_step(context)
         snapped = point.copy()
         for i in range(3):
             snapped[i] = round(point[i] / step) * step
         return snapped
 
     def _ghost_offsets(self, point, dup):
-        """Compute direction offsets from grabbed object's origin."""
+        """Compute direction offsets from grabbed object's origin.
+
+        Enabled axes define a constraint plane/line — the offset is projected
+        onto the subspace spanned by the active axes.
+        """
         diff = point - self._origin
         any_axis = dup.axis_x or dup.axis_y or dup.axis_z
         is_circle = dup.mode == "CIRCLE"
         factor = 1.0 if is_circle else (2.0 if dup.double else 1.0)
-        offsets = []
         if not any_axis:
-            offsets.append(diff * factor)
-        else:
-            r = self._local_rot if dup.snap.orientation == "LOCAL" else Matrix.Identity(3)
-            for name, enabled in [("x", dup.axis_x), ("y", dup.axis_y), ("z", dup.axis_z)]:
-                if not enabled:
-                    continue
+            return [diff * factor]
+        r = self._local_rot if dup.snap.orientation == "LOCAL" else Matrix.Identity(3)
+        combined = Vector((0, 0, 0))
+        for name, enabled in [("x", dup.axis_x), ("y", dup.axis_y), ("z", dup.axis_z)]:
+            if enabled:
                 d = r @ AXIS_DATA[name][0]
-                offsets.append(d * factor * diff.dot(d))
-        return offsets
+                combined += d * diff.dot(d)
+        return [combined * factor]
 
     @staticmethod
     def _view_normal(context):
         rv3d = context.region_data
         return -rv3d.view_matrix.inverted().col[2].to_3d().normalized()
 
-    def _circle_axes(self, dup, context):
-        """Return rotation axes for circle mode based on axis constraints."""
-        any_axis = dup.axis_x or dup.axis_y or dup.axis_z
-        if not any_axis:
-            return [self._view_normal(context)]
-        r = self._local_rot if dup.snap.orientation == "LOCAL" else Matrix.Identity(3)
-        axes = []
-        for name, enabled in [("x", dup.axis_x), ("y", dup.axis_y), ("z", dup.axis_z)]:
-            if not enabled:
-                continue
-            axes.append(r @ AXIS_DATA[name][0])
-        return axes
+    def _circle_axis(self, dup, context):
+        """Return a single rotation axis for circle mode."""
+        return _compute_circle_axis(
+            dup.axis_x, dup.axis_y, dup.axis_z,
+            dup.snap.orientation, self._local_rot, context,
+        )
 
     @staticmethod
     def _apply_circle_align(obj, angle, axis):
@@ -619,17 +789,23 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
 
         if dup.mode == "CIRCLE":
             diff = point - self._origin
-            rot_axes = self._circle_axes(dup, context)
+            rot_axis = self._circle_axis(dup, context)
+            face_dir = _resolve_face_direction(
+                dup.face_axis, dup.snap.orientation, self._local_rot, rot_axis,
+            )
             for org in self._origins:
-                center = org + diff
-                radius = -diff
-                for axis in rot_axes:
-                    for i in range(1, count + 1):
-                        angle = 2 * pi * i / (count + 1)
-                        rot = Matrix.Rotation(angle, 3, axis)
-                        pos = center + rot @ radius
-                        ghost_rot = rot if align else None
-                        placements.append((pos, scale, ghost_rot))
+                if face_dir is not None:
+                    start = face_dir * diff.length / 2
+                    center = org + diff / 2
+                else:
+                    center = org + diff
+                    start = -diff
+                for i in range(1, count + 1):
+                    angle = 2 * pi * i / (count + 1)
+                    rot = Matrix.Rotation(angle, 3, rot_axis)
+                    pos = center + rot @ start
+                    ghost_rot = rot if align else None
+                    placements.append((pos, scale, ghost_rot))
         else:
             offsets = self._ghost_offsets(point, dup)
             any_axis = dup.axis_x or dup.axis_y or dup.axis_z
@@ -652,7 +828,10 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
         col.prop(self, "location")
 
     def execute(self, context):
-        self._create_duplicates(context)
+        if addon.pref().tools.array.real:
+            self._create_duplicates(context)
+        else:
+            self._create_gn_array(context)
         return {"FINISHED"}
 
     def _finish(self, context):
@@ -665,7 +844,7 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
             context.area.tag_redraw()
             return
 
-        dup = addon.pref().tools.duplicate
+        dup = addon.pref().tools.array
         self.count = dup.count
         self.dup_scale = dup.scale
         self.location = self._last_point
@@ -675,10 +854,106 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
         self.axis_z = dup.axis_z
         self.double = dup.double
         self.align = dup.align
+        self.face_axis = dup.face_axis
         self.orientation = dup.snap.orientation
 
-        self._create_duplicates(context)
+        if dup.real:
+            self._create_duplicates(context)
+        else:
+            self._create_gn_array(context)
         context.area.tag_redraw()
+
+    def _create_gn_array(self, context):
+        """Create GN Array modifiers using the essentials Array node group."""
+        obj = bpy.data.objects.get(self.object_name) if self.object_name else context.active_object
+        if not obj:
+            return
+
+        array_group = _get_array_node_group()
+        if not array_group:
+            return
+
+        selection = list(context.selected_objects)
+        if not selection:
+            selection = [obj]
+
+        count = self.count
+        origin = obj.matrix_world.translation.copy()
+        local_rot = obj.matrix_world.to_3x3().normalized()
+        point = Vector(self.location)
+        diff = point - origin
+        any_axis = self.axis_x or self.axis_y or self.axis_z
+        is_circle = self.mode == "CIRCLE"
+        factor = 2.0 if self.double else 1.0
+
+        # Compute world-space offset for linear mode
+        if not is_circle:
+            if not any_axis:
+                total_offset = diff * factor
+            else:
+                r = local_rot if self.orientation == "LOCAL" else Matrix.Identity(3)
+                total_offset = Vector((0, 0, 0))
+                for name, enabled in [("x", self.axis_x), ("y", self.axis_y), ("z", self.axis_z)]:
+                    if enabled:
+                        d = r @ AXIS_DATA[name][0]
+                        total_offset += d * factor * diff.dot(d)
+            step_offset = total_offset / count if count > 0 else total_offset
+
+        ids = _input_identifier_map(array_group)
+
+        for sel_obj in selection:
+            mod = sel_obj.modifiers.new("Array", 'NODES')
+            if not mod:
+                continue
+            mod.node_group = array_group
+
+            def set_input(name, value):
+                _set_gn_input(mod, ids.get(name), value)
+
+            # GN Array counts the original as 1, so add 1
+            set_input("Count", count + 1)
+
+            if is_circle:
+                rot_axis = _compute_circle_axis(
+                    self.axis_x, self.axis_y, self.axis_z,
+                    self.orientation, local_rot, context,
+                )
+                radius = diff.length
+
+                # Always orient: local Z = rotation axis, Central Axis = Z.
+                z = rot_axis.normalized()
+                face_dir = _resolve_face_direction(
+                    self.face_axis, self.orientation, local_rot, rot_axis,
+                )
+                if face_dir is not None:
+                    y = face_dir
+                    sel_obj.location = sel_obj.matrix_world.translation + diff / 2
+                    radius = diff.length / 2
+                else:
+                    # Move object to cursor (circle center)
+                    sel_obj.location = sel_obj.matrix_world.translation + diff
+                    y = (-diff).normalized() if diff.length > 0 else z.orthogonal().normalized()
+                    y = y - z * y.dot(z)
+                    if y.length < 1e-6:
+                        y = z.orthogonal()
+                    y = y.normalized()
+                x = y.cross(z)
+                rot_matrix = Matrix((x, y, z)).transposed()
+                sel_obj.rotation_euler = rot_matrix.to_euler()
+
+                set_input("Shape", "Circle")
+                set_input("Radius", radius)
+                set_input("Central Axis", "Z")
+                set_input("Circle Segment", "Full")
+                set_input("Sweep Angle", 2 * pi)
+                set_input("Offset", (0.0, 0.0, 0.0))
+            else:
+                local_step = sel_obj.matrix_world.inverted().to_3x3() @ step_offset
+                set_input("Shape", "Line")
+                set_input("Offset Method", "Offset")
+                set_input("Translation", local_step[:])
+
+            array_group.interface_update(context)
 
     def _create_duplicates(self, context):
         """Create duplicate objects using operator properties."""
@@ -703,72 +978,70 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
         copies = []
         if is_circle:
             diff = point - origin
-            if not any_axis:
-                rv3d = context.region_data
-                if rv3d:
-                    rot_axes = [-rv3d.view_matrix.inverted().col[2].to_3d().normalized()]
-                else:
-                    rot_axes = [Vector((0, 0, 1))]
-            else:
-                r = local_rot if self.orientation == "LOCAL" else Matrix.Identity(3)
-                rot_axes = []
-                for name, enabled in [("x", self.axis_x), ("y", self.axis_y), ("z", self.axis_z)]:
-                    if enabled:
-                        rot_axes.append(r @ AXIS_DATA[name][0])
+            rot_axis = _compute_circle_axis(
+                self.axis_x, self.axis_y, self.axis_z,
+                self.orientation, local_rot, context,
+            )
+
+            face_dir = _resolve_face_direction(
+                self.face_axis, self.orientation, local_rot, rot_axis,
+            )
 
             for sel_obj in selection:
                 org = sel_obj.matrix_world.translation
-                center = org + diff
-                radius = -diff
-                for axis_idx, axis in enumerate(rot_axes):
-                    for i in range(1, count + 1):
-                        angle = 2 * pi * i / (count + 1)
-                        rot = Matrix.Rotation(angle, 3, axis)
-                        pos = center + rot @ radius
+                if face_dir is not None:
+                    start = face_dir * diff.length / 2
+                    center = org + diff / 2
+                else:
+                    center = org + diff
+                    start = -diff
+                for i in range(1, count + 1):
+                    angle = 2 * pi * i / (count + 1)
+                    rot = Matrix.Rotation(angle, 3, rot_axis)
+                    pos = center + rot @ start
 
-                        new_obj = sel_obj.copy()
-                        new_obj.data = sel_obj.data.copy()
-                        if sel_obj.parent and sel_obj.parent in sel_set:
-                            new_obj.parent = None
-                        for col in sel_obj.users_collection:
-                            col.objects.link(new_obj)
+                    new_obj = sel_obj.copy()
+                    new_obj.data = sel_obj.data.copy()
+                    is_child = sel_obj.parent and sel_obj.parent in sel_set
+                    for col in sel_obj.users_collection:
+                        col.objects.link(new_obj)
+                    if not is_child:
                         new_obj.location = pos
                         new_obj.scale = sel_obj.scale * scale
                         if self.align:
-                            self._apply_circle_align(new_obj, angle, axis)
-                        new_objects.append(new_obj)
-                        copies.append((sel_obj, new_obj, axis_idx * count + i - 1))
+                            self._apply_circle_align(new_obj, angle, rot_axis)
+                    new_objects.append(new_obj)
+                    copies.append((sel_obj, new_obj, i - 1))
         else:
             diff = point - origin
             factor = 2.0 if self.double else 1.0
-            offsets = []
             if not any_axis:
-                offsets.append(diff * factor)
+                offset = diff * factor
             else:
                 r = local_rot if self.orientation == "LOCAL" else Matrix.Identity(3)
+                offset = Vector((0, 0, 0))
                 for name, enabled in [("x", self.axis_x), ("y", self.axis_y), ("z", self.axis_z)]:
                     if enabled:
                         d = r @ AXIS_DATA[name][0]
-                        offsets.append(d * factor * diff.dot(d))
+                        offset += d * factor * diff.dot(d)
 
             for sel_obj in selection:
                 org = sel_obj.matrix_world.translation
-                for offset_idx, offset in enumerate(offsets):
-                    for i in range(1, count + 1):
-                        t = i / count
-                        s = 1.0 + (scale - 1.0) * t
-                        pos = org + offset * t
+                for i in range(1, count + 1):
+                    t = i / count
+                    s = 1.0 + (scale - 1.0) * t
+                    pos = org + offset * t
 
-                        new_obj = sel_obj.copy()
-                        new_obj.data = sel_obj.data.copy()
-                        if sel_obj.parent and sel_obj.parent in sel_set:
-                            new_obj.parent = None
-                        for col in sel_obj.users_collection:
-                            col.objects.link(new_obj)
+                    new_obj = sel_obj.copy()
+                    new_obj.data = sel_obj.data.copy()
+                    is_child = sel_obj.parent and sel_obj.parent in sel_set
+                    for col in sel_obj.users_collection:
+                        col.objects.link(new_obj)
+                    if not is_child:
                         new_obj.location = pos
                         new_obj.scale = sel_obj.scale * s
-                        new_objects.append(new_obj)
-                        copies.append((sel_obj, new_obj, offset_idx * count + i - 1))
+                    new_objects.append(new_obj)
+                    copies.append((sel_obj, new_obj, i - 1))
 
         _remap_references(copies, selection, context)
 
@@ -787,4 +1060,4 @@ class ROTOR_OT_DuplicateModal(bpy.types.Operator):
         context.area.tag_redraw()
 
 
-classes = (ROTOR_OT_DuplicateModal,)
+classes = (ROTOR_OT_ArrayModal,)

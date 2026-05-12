@@ -4,7 +4,7 @@ import bpy
 class ROTOR_OT_SetActiveToolOperator(bpy.types.Operator):
     """Set Active Tool to Brush Select"""
 
-    bl_idname = "object.rotor_set_active_tool"
+    bl_idname = "object.mirror_set_active_tool"
     bl_label = "Set Active Tool"
 
     def execute(self, context):
@@ -13,14 +13,14 @@ class ROTOR_OT_SetActiveToolOperator(bpy.types.Operator):
         ).idname
 
         tools = [
-            "rotor.mirror_tool",
+            "mirror.mirror_tool",
         ]
 
         if active_tool not in tools:
             # Store the current tool before switching
             context.scene.rotor.ops.last_tool = active_tool
 
-            bpy.ops.wm.tool_set_by_id(name="rotor.mirror_tool")
+            bpy.ops.wm.tool_set_by_id(name="mirror.mirror_tool")
 
         return {"FINISHED"}
 

@@ -1,8 +1,8 @@
 from . import mirror
-from . import duplicate
+from . import array
 
 
-types_classes = (*mirror.types_classes, *duplicate.types_classes)
+types_classes = (*mirror.types_classes, *array.types_classes)
 
 
-classes = (*mirror.classes, *duplicate.classes)
+classes = (*mirror.classes, *array.classes)

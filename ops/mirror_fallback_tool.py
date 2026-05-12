@@ -1,12 +1,12 @@
 import bpy
 
-ROTOR_TOOLS = {"rotor.mirror_tool", "rotor.duplicate_tool"}
+ROTOR_TOOLS = {"mirror.mirror_tool", "mirror.array_tool"}
 
 
 class ROTOR_OT_FallbackTool(bpy.types.Operator):
     """Return to previous tool"""
 
-    bl_idname = "rotor.fallback_tool"
+    bl_idname = "mirror.fallback_tool"
     bl_label = "Return to Previous Tool"
     bl_options = {"REGISTER", "INTERNAL"}
 
@@ -34,7 +34,7 @@ class ROTOR_OT_FallbackTool(bpy.types.Operator):
                 except Exception:
                     self.report({"WARNING"}, "Failed to switch to previous tool")
             else:
-                self.report({"INFO"}, "Not using a Rotor tool")
+                self.report({"INFO"}, "Not using a Mirror tool")
         else:
             self.report({"INFO"}, "No previous tool stored")
 

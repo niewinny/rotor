@@ -22,10 +22,10 @@ orientation_items = [
 ]
 
 
-class DuplicateSnap(bpy.types.PropertyGroup):
+class ArraySnap(bpy.types.PropertyGroup):
     pivot: bpy.props.EnumProperty(
         name="Pivot",
-        description="Snap target for duplicate placement",
+        description="Snap target for array placement",
         items=pivot_items,
         default="INCREMENT",
     )
@@ -37,7 +37,7 @@ class DuplicateSnap(bpy.types.PropertyGroup):
     )
 
 
-class Duplicate(bpy.types.PropertyGroup):
+class Array(bpy.types.PropertyGroup):
     mode: bpy.props.EnumProperty(
         name="Mode",
         description="Distribution mode for duplicates",
@@ -83,7 +83,23 @@ class Duplicate(bpy.types.PropertyGroup):
         description="Orient all objects (including selected) to face the cursor",
         default=False,
     )
-    snap: bpy.props.PointerProperty(type=DuplicateSnap)
+    face_axis: bpy.props.EnumProperty(
+        name="Face",
+        description="Direction instances face on the circle (Ctrl+X/Y/Z)",
+        items=[
+            ("NONE", "None", "Automatic facing direction"),
+            ("X", "X", "Face along X axis"),
+            ("Y", "Y", "Face along Y axis"),
+            ("Z", "Z", "Face along Z axis"),
+        ],
+        default="NONE",
+    )
+    real: bpy.props.BoolProperty(
+        name="Real",
+        description="Create real object copies instead of GN Array modifier",
+        default=False,
+    )
+    snap: bpy.props.PointerProperty(type=ArraySnap)
 
 
-classes = (DuplicateSnap, Duplicate)
+classes = (ArraySnap, Array)

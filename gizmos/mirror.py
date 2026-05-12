@@ -70,11 +70,11 @@ def set_mirror_gizmo(group, axis, color, idx, size=1.0):
 
 class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
     """
-    GizmoGroup for Rotor Mirror Tool. Displays axis arrow gizmos for mirroring operations in the 3D view.
+    GizmoGroup for Mirror Tool. Displays axis arrow gizmos for mirroring operations in the 3D view.
     """
 
     bl_idname = "ROTOR_GGT_MirrorGizmoGroup"
-    bl_label = "Rotor Mirror Gizmo"
+    bl_label = "Mirror Gizmo"
     bl_space_type = "VIEW_3D"
     bl_region_type = "WINDOW"
     bl_options = {"3D", "SHOW_MODAL_ALL"}
@@ -88,7 +88,7 @@ class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
 
     @classmethod
     def poll(cls, context) -> bool:
-        """Show gizmos only when the rotor mirror tool is active and objects are selected."""
+        """Show gizmos only when the mirror tool is active and objects are selected."""
         active_tool = bpy.context.workspace.tools.from_space_view3d_mode(
             bpy.context.mode, create=False
         )
@@ -97,7 +97,7 @@ class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
         ]
         return bool(
             active_tool
-            and active_tool.idname == "rotor.mirror_tool"
+            and active_tool.idname == "mirror.mirror_tool"
             and selected_objects
         )
 
@@ -113,6 +113,10 @@ class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
         arrow_highlights = [
             getattr(theme_axis, axis_highlight_names[i]) for i in range(6)
         ]
+
+        # Real mode: skip modifier-state coloring, return default colors
+        if mirror_tool.real:
+            return arrow_colors, arrow_highlights
 
         # Find active mesh
         active_mesh = (
@@ -184,7 +188,7 @@ class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
             gz_arrow = create_mirror_gizmo(self, axis, color, idx, gizmo_size)
             gz_arrow.color_highlight = lighter(axis_highlight_color, 0.5)[:3]
             gz_arrow.alpha_highlight = axis_highlight_color[3]
-            gz_op = gz_arrow.target_set_operator("rotor.set_mirror_axis")
+            gz_op = gz_arrow.target_set_operator("mirror.set_mirror_axis")
             gz_op.axis = axis
             gz_op.sign = sign
             gz_arrow.hide = hide_mirror_gizmos
@@ -197,7 +201,7 @@ class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
             gz_collection_arrow.color_highlight = lighter(color, 0.5)[:3]
             gz_collection_arrow.alpha_highlight = color[3]
             gz_op = gz_collection_arrow.target_set_operator(
-                "rotor.add_mirror_collection"
+                "mirror.add_mirror_collection"
             )
             gz_op.axis = axis
             gz_op.sign = sign
@@ -208,7 +212,7 @@ class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
             gz_box = set_mirror_gizmo(self, axis, main_color, idx, gizmo_size)
             gz_box.color_highlight = lighter(color, 0.5)[:3]
             gz_box.alpha_highlight = color[3]
-            gz_op = gz_box.target_set_operator("rotor.add_mirror_axis")
+            gz_op = gz_box.target_set_operator("mirror.add_mirror_axis")
             gz_op.axis = axis
             gz_op.sign = sign
             gz_box.hide_select = hide_mirror_gizmos

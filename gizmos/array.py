@@ -2,11 +2,11 @@ import bpy
 from mathutils import Matrix
 
 
-class ROTOR_GGT_DuplicateGizmoGroup(bpy.types.GizmoGroup):
-    """GizmoGroup for Rotor Duplicate Tool. Displays a move circle gizmo at each selected object's origin."""
+class ROTOR_GGT_ArrayGizmoGroup(bpy.types.GizmoGroup):
+    """GizmoGroup for Array Tool. Displays a move circle gizmo at each selected object's origin."""
 
-    bl_idname = "ROTOR_GGT_DuplicateGizmoGroup"
-    bl_label = "Rotor Duplicate Gizmo"
+    bl_idname = "ROTOR_GGT_ArrayGizmoGroup"
+    bl_label = "Array Gizmo"
     bl_space_type = "VIEW_3D"
     bl_region_type = "WINDOW"
     bl_options = {"3D", "SHOW_MODAL_ALL", "PERSISTENT"}
@@ -22,7 +22,7 @@ class ROTOR_GGT_DuplicateGizmoGroup(bpy.types.GizmoGroup):
         )
         return bool(
             active_tool
-            and active_tool.idname == "rotor.duplicate_tool"
+            and active_tool.idname == "mirror.array_tool"
         )
 
     def setup(self, context):
@@ -49,7 +49,7 @@ class ROTOR_GGT_DuplicateGizmoGroup(bpy.types.GizmoGroup):
             mat = Matrix.Identity(4)
             mat.translation = obj.matrix_world.translation.copy()
             gz.matrix_basis = mat
-            op = gz.target_set_operator("rotor.duplicate_modal")
+            op = gz.target_set_operator("mirror.array_modal")
             op.object_name = obj.name
             self.gizmos_list.append((gz, obj.name))
 
@@ -67,4 +67,4 @@ class ROTOR_GGT_DuplicateGizmoGroup(bpy.types.GizmoGroup):
                 gz.hide = True
 
 
-classes = (ROTOR_GGT_DuplicateGizmoGroup,)
+classes = (ROTOR_GGT_ArrayGizmoGroup,)
