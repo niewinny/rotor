@@ -7,6 +7,7 @@ from .mirror_utils import (
     get_mirror_object,
     create_mirror_modifier,
     bisect_object,
+    execute_real_mirror,
 )
 from .mirror_props import ROTOR_PG_MirrorObjectItem
 
@@ -48,31 +49,33 @@ class ROTOR_OT_SetMirrorAxis(bpy.types.Operator):
         is_neg = self.sign == "NEG"
         is_disabling = False
 
-        # Only check active object if it's selected
-        # Only check PINNED modifiers since set operation only affects pinned modifiers
-        if (
-            active_object
-            and active_object.type == "MESH"
-            and active_object.select_get()
-        ):
-            # Only look for pinned mirror modifiers for set operations
-            active_mirror_mod = next(
-                (
-                    m
-                    for m in reversed(active_object.modifiers)
-                    if m.type == "MIRROR" and m.use_pin_to_last
-                ),
-                None,
-            )
-            if active_mirror_mod:
-                # Check if we're trying to disable the axis on the pinned modifier
-                current_state = (
-                    active_mirror_mod.use_axis[axis_idx],
-                    active_mirror_mod.use_bisect_flip_axis[axis_idx],
-                    is_neg,
+        # Real mode is always additive — skip is_disabling detection
+        if not pref.real:
+            # Only check active object if it's selected
+            # Only check PINNED modifiers since set operation only affects pinned modifiers
+            if (
+                active_object
+                and active_object.type == "MESH"
+                and active_object.select_get()
+            ):
+                # Only look for pinned mirror modifiers for set operations
+                active_mirror_mod = next(
+                    (
+                        m
+                        for m in reversed(active_object.modifiers)
+                        if m.type == "MIRROR" and m.use_pin_to_last
+                    ),
+                    None,
                 )
-                new_axis, _ = MIRROR_AXIS_TRANSITIONS[current_state]
-                is_disabling = active_mirror_mod.use_axis[axis_idx] and not new_axis
+                if active_mirror_mod:
+                    # Check if we're trying to disable the axis on the pinned modifier
+                    current_state = (
+                        active_mirror_mod.use_axis[axis_idx],
+                        active_mirror_mod.use_bisect_flip_axis[axis_idx],
+                        is_neg,
+                    )
+                    new_axis, _ = MIRROR_AXIS_TRANSITIONS[current_state]
+                    is_disabling = active_mirror_mod.use_axis[axis_idx] and not new_axis
 
         # Add active object first if it's a mesh and selected
         if (
@@ -198,13 +201,7 @@ class ROTOR_OT_SetMirrorAxis(bpy.types.Operator):
                 new_axis, _ = MIRROR_AXIS_TRANSITIONS[current_state]
                 is_disabling = active_mirror_mod.use_axis[axis_idx] and not new_axis
 
-        # Always calculate mirror object based on active object for consistency
-        # This ensures all selected objects mirror relative to the same reference point
-        mirror_object, individual = get_mirror_object(
-            context, active_object, pivot, orientation
-        )
-
-        # Get list of enabled objects
+        # Get list of enabled objects (shared by both modes)
         enabled_objects = []
         if hasattr(self, "affected_objects") and self.affected_objects:
             for item in self.affected_objects:
@@ -213,10 +210,19 @@ class ROTOR_OT_SetMirrorAxis(bpy.types.Operator):
                     if obj.type == "MESH":
                         enabled_objects.append(obj)
         else:
-            # First run - use all selected mesh objects
             enabled_objects = [
                 obj for obj in context.selected_objects if obj.type == "MESH"
             ]
+
+        # Real mode: create duplicated + flipped copies
+        if pref.real:
+            return execute_real_mirror(self, context, axis_idx, is_neg, enabled_objects)
+
+        # Always calculate mirror object based on active object for consistency
+        # This ensures all selected objects mirror relative to the same reference point
+        mirror_object, individual = get_mirror_object(
+            context, active_object, pivot, orientation
+        )
 
         for obj in enabled_objects:
             # ONLY work with pinned mirror modifiers for set operation

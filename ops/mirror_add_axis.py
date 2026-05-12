@@ -1,7 +1,7 @@
 import bpy
 from bpy.props import CollectionProperty, IntProperty
 from ..utils import addon
-from .mirror_utils import get_mirror_object, create_mirror_modifier, bisect_object
+from .mirror_utils import get_mirror_object, create_mirror_modifier, bisect_object, execute_real_mirror
 from .mirror_props import ROTOR_PG_MirrorObjectItem
 
 
@@ -90,11 +90,7 @@ class ROTOR_OT_AddMirrorAxis(bpy.types.Operator):
         pivot = pref.pivot
         orientation = pref.orientation
 
-        mirror_object, individual = get_mirror_object(
-            context, active_object, pivot, orientation
-        )
-
-        # Get list of enabled objects
+        # Get list of enabled objects (shared by both modes)
         enabled_objects = []
         if hasattr(self, "affected_objects") and self.affected_objects:
             for item in self.affected_objects:
@@ -103,10 +99,17 @@ class ROTOR_OT_AddMirrorAxis(bpy.types.Operator):
                     if obj.type == "MESH":
                         enabled_objects.append(obj)
         else:
-            # First run - use all selected mesh objects
             enabled_objects = [
                 obj for obj in context.selected_objects if obj.type == "MESH"
             ]
+
+        # Real mode: create duplicated + flipped copies
+        if pref.real:
+            return execute_real_mirror(self, context, axis_idx, is_neg, enabled_objects)
+
+        mirror_object, individual = get_mirror_object(
+            context, active_object, pivot, orientation
+        )
 
         affected_count = 0
         for obj in enabled_objects:

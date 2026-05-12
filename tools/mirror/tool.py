@@ -30,6 +30,7 @@ class ROTOR_MT_Mirror(bpy.types.WorkSpaceTool):
         row.popover("ROTOR_PT_Element", text=label, icon=icon)
         row.separator()
 
+        row.prop(rotor, "real", text="Real")
         row.prop(rotor, "bisect", text="Bisect")
         row.separator()
         row.prop(rotor, "tool_fallback", text="Tool Fallback")
@@ -62,4 +63,6 @@ class ROTOR_MT_Mirror(bpy.types.WorkSpaceTool):
         row.separator()
         sub = row.row(align=True)
         sub.popover("ROTOR_PT_ToolOptions", text="", icon="EMPTY_AXIS")
-        sub.popover("ROTOR_PT_MirrorOptions", text="", icon="MOD_MIRROR")
+        mirror_opts = sub.row(align=True)
+        mirror_opts.enabled = not rotor.real
+        mirror_opts.popover("ROTOR_PT_MirrorOptions", text="", icon="MOD_MIRROR")

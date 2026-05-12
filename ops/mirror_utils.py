@@ -1,6 +1,6 @@
 import bpy
 import bmesh
-from mathutils import Vector
+from mathutils import Matrix, Vector
 from ..utils import addon
 
 
@@ -227,3 +227,128 @@ def bisect_object(obj, axis_idx, pivot, orientation, context, is_neg=False):
 
     # Update object
     obj.data.update()
+
+
+def create_real_mirror(context, obj, axis_idx, is_neg):
+    """Duplicate object + mesh and flip across the mirror axis.
+
+    Returns the new object or None if the object type is unsupported.
+    """
+    pref = addon.pref().tools.mirror
+    pivot = pref.pivot
+    orientation = pref.orientation
+
+    # 1. Duplicate object and mesh data
+    new_obj = obj.copy()
+    if obj.data:
+        new_obj.data = obj.data.copy()
+
+    # Link to same collections
+    for col in obj.users_collection:
+        col.objects.link(new_obj)
+
+    # 2. Build scale matrix with -1 on mirror axis
+    scale_vec = [1.0, 1.0, 1.0]
+    scale_vec[axis_idx] = -1.0
+    mirror_mat = (
+        Matrix.Scale(scale_vec[0], 4, Vector((1, 0, 0)))
+        @ Matrix.Scale(scale_vec[1], 4, Vector((0, 1, 0)))
+        @ Matrix.Scale(scale_vec[2], 4, Vector((0, 0, 1)))
+    )
+
+    # 3. Compute pivot point
+    if pivot == "WORLD":
+        pivot_point = Vector((0, 0, 0))
+    elif pivot == "ACTIVE" and context.active_object:
+        pivot_point = context.active_object.location.copy()
+    elif pivot == "INDIVIDUAL":
+        pivot_point = obj.location.copy()
+    elif pivot == "CURSOR":
+        pivot_point = context.scene.cursor.location.copy()
+    else:
+        pivot_point = Vector((0, 0, 0))
+
+    # 4. Compute rotation from orientation
+    rot_mat = None
+    if orientation == "LOCAL":
+        if pivot == "ACTIVE" and context.active_object:
+            rot_mat = context.active_object.rotation_euler.to_matrix().to_4x4()
+        elif pivot == "INDIVIDUAL":
+            rot_mat = obj.rotation_euler.to_matrix().to_4x4()
+        elif pivot in ("WORLD", "CURSOR"):
+            rot_mat = obj.rotation_euler.to_matrix().to_4x4()
+    elif orientation == "CURSOR":
+        rot_mat = context.scene.cursor.rotation_euler.to_matrix().to_4x4()
+
+    # 5. Compose mirror_xform = T @ R @ S @ R_inv @ T_inv
+    T = Matrix.Translation(pivot_point)
+    T_inv = Matrix.Translation(-pivot_point)
+    S = mirror_mat
+    if rot_mat is not None:
+        R = rot_mat
+        R_inv = rot_mat.inverted()
+        mirror_xform = T @ R @ S @ R_inv @ T_inv
+    else:
+        mirror_xform = T @ S @ T_inv
+
+    # 6. Apply transform
+    new_obj.matrix_world = mirror_xform @ obj.matrix_world
+
+    # 7. Fix normals — negative scale inverts face winding
+    if new_obj.type == "MESH" and new_obj.data:
+        bm = bmesh.new()
+        bm.from_mesh(new_obj.data)
+        bmesh.ops.reverse_faces(bm, faces=bm.faces[:])
+        bm.to_mesh(new_obj.data)
+        bm.free()
+        new_obj.data.update()
+
+    return new_obj
+
+
+def execute_real_mirror(operator, context, axis_idx, is_neg, enabled_objects):
+    """Shared helper for real-mirror mode used by both set and add operators.
+
+    Handles bisect, loop over objects, selection update, and report.
+    Returns {'FINISHED'} or {'CANCELLED'}.
+    """
+    pref = addon.pref().tools.mirror
+    pivot = pref.pivot
+    orientation = pref.orientation
+
+    new_objects = []
+    for obj in enabled_objects:
+        if pref.bisect:
+            bisect_object(obj, axis_idx, pivot, orientation, context, is_neg)
+
+        new_obj = create_real_mirror(context, obj, axis_idx, is_neg)
+        if new_obj:
+            new_objects.append(new_obj)
+
+    if not new_objects:
+        operator.report({"WARNING"}, "No objects were mirrored.")
+        return {"CANCELLED"}
+
+    # Update selection: deselect originals, select new objects
+    for obj in enabled_objects:
+        obj.select_set(False)
+    for new_obj in new_objects:
+        new_obj.select_set(True)
+    context.view_layer.objects.active = new_objects[0]
+
+    operator.report({"INFO"}, f"Created {len(new_objects)} mirrored copies.")
+
+    # Tool fallback
+    last_tool = context.scene.rotor.ops.last_tool
+    if pref.tool_fallback and last_tool:
+        current_tool = context.workspace.tools.from_space_view3d_mode(
+            context.mode, create=False
+        )
+        if current_tool and current_tool.idname == "mirror.mirror_tool":
+            try:
+                bpy.ops.wm.tool_set_by_id(name=last_tool)
+                context.scene.rotor.ops.last_tool = ""
+            except Exception:
+                pass
+
+    return {"FINISHED"}

@@ -107,6 +107,11 @@ class ROTOR_PT_MirrorOptions(bpy.types.Panel):
         layout = self.layout
         rotor = addon.pref().tools.mirror
 
+        if rotor.real:
+            layout.label(text="Mirror modifier options not used in Real mode", icon="INFO")
+            layout.enabled = False
+            return
+
         layout.use_property_split = False
         layout.use_property_decorate = False
 
