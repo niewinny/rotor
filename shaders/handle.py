@@ -18,6 +18,7 @@ class Handle:
             bpy.types.SpaceView3D.draw_handler_remove(self.handle, "WINDOW")
             if self.handle in draw_handlers:
                 draw_handlers.remove(self.handle)
+            self.handle = None
 
 
 @dataclass

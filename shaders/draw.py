@@ -73,13 +73,25 @@ class GuideDraw(DrawBase):
         ep = Vector(endpoint)
         rot = orientation or Matrix.Identity(3)
         factor = 2.0 if double else 1.0
+        diff = ep - org
 
-        guide_ep = ep if has_axis else org + (ep - org) * factor
+        # Project the gray guide line onto the constraint plane/line
+        if has_axis:
+            projected = Vector((0, 0, 0))
+            for name, enabled in [("x", axis_x), ("y", axis_y), ("z", axis_z)]:
+                if enabled:
+                    d = rot @ AXIS_DATA[name][0]
+                    projected += d * diff.dot(d)
+            guide_ep = org + projected * factor
+        else:
+            guide_ep = org + diff * factor
+
         vertices = [origin[:], guide_ep[:]]
         colors = [guide_color, guide_color]
         indices = [(0, 1)]
         idx = 2
 
+        # Axis cross at the raw endpoint
         for name in ("x", "y", "z"):
             direction, color = AXIS_DATA[name]
             d = rot @ direction
@@ -90,7 +102,7 @@ class GuideDraw(DrawBase):
             indices.append((idx, idx + 1))
             idx += 2
 
-        diff = ep - org
+        # Per-axis colored lines from origin (same as before)
         axes = {"x": axis_x, "y": axis_y, "z": axis_z}
         for name, enabled in axes.items():
             if not enabled:
