@@ -6,6 +6,7 @@ from . import (
     mirror_add_collection,
     mirror_fallback_tool,
     array_modal,
+    align_axis,
     set_tool,
 )
 
@@ -35,5 +36,6 @@ classes = (
     *mirror_add_collection.classes,
     *mirror_fallback_tool.classes,
     *array_modal.classes,
+    *align_axis.classes,
     *set_tool.classes,
 )

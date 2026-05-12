@@ -15,6 +15,7 @@ class Tools(bpy.types.PropertyGroup):
     )
     mirror: bpy.props.PointerProperty(type=tools.mirror.props.Mirror)
     array: bpy.props.PointerProperty(type=tools.array.props.Array)
+    align: bpy.props.PointerProperty(type=tools.align.props.Align)
 
 
 class Scene(bpy.types.PropertyGroup):

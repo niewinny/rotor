@@ -41,6 +41,12 @@ def register():
             separator=False,
             after={"mirror.mirror_tool"},
         )
+        register_tool(
+            tools.align.ROTOR_MT_Align,
+            group=False,
+            separator=False,
+            after={"mirror.array_tool"},
+        )
     else:
         # Default: use separator
         register_tool(tools.mirror.ROTOR_MT_Mirror, group=True, separator=True)
@@ -50,6 +56,12 @@ def register():
             separator=False,
             after={"mirror.mirror_tool"},
         )
+        register_tool(
+            tools.align.ROTOR_MT_Align,
+            group=False,
+            separator=False,
+            after={"mirror.array_tool"},
+        )
 
     btypes.register()
     keymap.register()
@@ -58,6 +70,7 @@ def register():
 def unregister():
     keymap.unregister()
 
+    unregister_tool(tools.align.ROTOR_MT_Align)
     unregister_tool(tools.array.ROTOR_MT_Array)
     unregister_tool(tools.mirror.ROTOR_MT_Mirror)
 
