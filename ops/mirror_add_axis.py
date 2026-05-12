@@ -8,8 +8,8 @@ from .mirror_props import ROTOR_PG_MirrorObjectItem
 class ROTOR_OT_AddMirrorAxis(bpy.types.Operator):
     """Add new mirror"""
 
-    bl_idname = "rotor.add_mirror_axis"
-    bl_label = "Rotor Mirror Axis"
+    bl_idname = "mirror.add_mirror_axis"
+    bl_label = "Mirror Axis"
     bl_options = {"REGISTER", "UNDO", "INTERNAL"}
 
     axis: bpy.props.EnumProperty(
@@ -129,7 +129,7 @@ class ROTOR_OT_AddMirrorAxis(bpy.types.Operator):
             current_tool = context.workspace.tools.from_space_view3d_mode(
                 context.mode, create=False
             )
-            if current_tool and current_tool.idname == "rotor.mirror_tool":
+            if current_tool and current_tool.idname == "mirror.mirror_tool":
                 try:
                     bpy.ops.wm.tool_set_by_id(name=last_tool)
                     # Clear the last tool to prevent stale references

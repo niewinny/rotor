@@ -8,11 +8,11 @@ def object_mode_hotkeys(kc):
 
     km = kc.keymaps.new(name="Object Mode", space_type="EMPTY")
     # menu hotkey
-    kmi = km.keymap_items.new("object.rotor_set_active_tool", "X", "PRESS", alt=True)
+    kmi = km.keymap_items.new("object.mirror_set_active_tool", "X", "PRESS", alt=True)
     keys.append((km, kmi))
-    # duplicate tool hotkey
+    # array tool hotkey
     kmi = km.keymap_items.new("wm.tool_set_by_id", "D", "PRESS", shift=True, alt=True)
-    kmi.properties.name = "rotor.duplicate_tool"
+    kmi.properties.name = "mirror.array_tool"
     keys.append((km, kmi))
 
 
