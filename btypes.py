@@ -14,7 +14,6 @@ class Tools(bpy.types.PropertyGroup):
         soft_max=2.0,
     )
     mirror: bpy.props.PointerProperty(type=tools.mirror.props.Mirror)
-    array: bpy.props.PointerProperty(type=tools.array.props.Array)
     align: bpy.props.PointerProperty(type=tools.align.props.Align)
 
 

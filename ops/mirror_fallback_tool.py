@@ -1,6 +1,6 @@
 import bpy
 
-ROTOR_TOOLS = {"mirror.mirror_tool", "mirror.array_tool", "mirror.align_tool"}
+ROTOR_TOOLS = {"mirror.mirror_tool", "mirror.align_tool"}
 
 
 class ROTOR_OT_FallbackTool(bpy.types.Operator):

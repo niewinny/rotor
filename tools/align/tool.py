@@ -12,7 +12,7 @@ class ROTOR_MT_Align(bpy.types.WorkSpaceTool):
     bl_label = "Align"
     bl_description = f"v: {addon.version}\n\nTool for aligning selected objects to world origin or active object"
     bl_widget = "ROTOR_GGT_AlignGizmoGroup"
-    bl_icon = (Path(__file__).parent.parent.parent / "icons" / "array").as_posix()
+    bl_icon = (Path(__file__).parent.parent.parent / "icons" / "align").as_posix()
     bl_keymap = (("mirror.fallback_tool", {"type": "ESC", "value": "PRESS"}, None),)
 
     def draw_settings(context, layout, tool):
