@@ -14,6 +14,7 @@ class Tools(bpy.types.PropertyGroup):
         soft_max=2.0,
     )
     mirror: bpy.props.PointerProperty(type=tools.mirror.props.Mirror)
+    mesh: bpy.props.PointerProperty(type=tools.mirror.props.MirrorMesh)
     align: bpy.props.PointerProperty(type=tools.align.props.Align)
 
 

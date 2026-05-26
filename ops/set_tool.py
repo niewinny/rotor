@@ -2,16 +2,35 @@ import bpy
 
 
 class ROTOR_OT_SetActiveToolOperator(bpy.types.Operator):
-    """Cycle between Mirror and Align; first press from another tool saves
-    that tool so ESC can return to it."""
+    """In Object Mode cycle between Mirror and Align; in Edit Mesh toggle the
+    Mirror tool. The first press from another tool saves that tool so ESC can
+    return to it."""
 
     bl_idname = "object.mirror_set_active_tool"
     bl_label = "Set Active Tool"
 
     def execute(self, context):
-        active_tool = context.workspace.tools.from_space_view3d_mode(
+        tool = context.workspace.tools.from_space_view3d_mode(
             context.mode, create=False
-        ).idname
+        )
+        active_tool = tool.idname if tool else ""
+
+        if context.mode == "EDIT_MESH":
+            if active_tool == "mirror.mirror_mesh_tool":
+                # Already on the mesh mirror tool — toggle back to the
+                # remembered tool, if any.
+                last_tool = context.scene.rotor.ops.last_tool
+                if last_tool:
+                    try:
+                        bpy.ops.wm.tool_set_by_id(name=last_tool)
+                        context.scene.rotor.ops.last_tool = ""
+                    except Exception:
+                        pass
+            else:
+                # Coming from another tool — remember it and enter mirror.
+                context.scene.rotor.ops.last_tool = active_tool
+                bpy.ops.wm.tool_set_by_id(name="mirror.mirror_mesh_tool")
+            return {"FINISHED"}
 
         if active_tool == "mirror.mirror_tool":
             # Already on mirror — jump to align without touching last_tool

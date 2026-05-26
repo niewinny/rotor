@@ -12,6 +12,15 @@ def object_mode_hotkeys(kc):
     keys.append((km, kmi))
 
 
+def mesh_edit_hotkeys(kc):
+    """Edit Mesh Mode Hotkeys"""
+
+    km = kc.keymaps.new(name="Mesh", space_type="EMPTY")
+    # menu hotkey
+    kmi = km.keymap_items.new("object.mirror_set_active_tool", "X", "PRESS", alt=True)
+    keys.append((km, kmi))
+
+
 def register():
     """Register Keymaps"""
 
@@ -22,6 +31,7 @@ def register():
     kc = addon_keyconfig
 
     object_mode_hotkeys(kc)
+    mesh_edit_hotkeys(kc)
 
     del active_keyconfig
     del addon_keyconfig

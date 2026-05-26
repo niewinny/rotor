@@ -51,6 +51,9 @@ def register():
             after={"mirror.mirror_tool"},
         )
 
+    # Edit-mesh mirror tool (separate context mode)
+    register_tool(tools.mirror.ROTOR_MT_MirrorMesh, group=False, separator=True)
+
     btypes.register()
     keymap.register()
 
@@ -58,6 +61,7 @@ def register():
 def unregister():
     keymap.unregister()
 
+    unregister_tool(tools.mirror.ROTOR_MT_MirrorMesh)
     unregister_tool(tools.align.ROTOR_MT_Align)
     unregister_tool(tools.mirror.ROTOR_MT_Mirror)
 

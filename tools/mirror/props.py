@@ -33,6 +33,29 @@ orientations = [
 ]
 
 
+# Edit-mode (mesh) orientations and pivots
+mesh_orientations = [
+    ("GLOBAL", "Global", "Mirror using Global orientation", "ORIENTATION_GLOBAL", 1),
+    ("LOCAL", "Local", "Mirror using Local orientation", "ORIENTATION_LOCAL", 2),
+    ("CURSOR", "Cursor", "Mirror using 3D Cursor orientation", "ORIENTATION_CURSOR", 3),
+    (
+        "NORMAL",
+        "Normal",
+        "Mirror using the selection Normal orientation",
+        "ORIENTATION_NORMAL",
+        4,
+    ),
+]
+
+
+mesh_pivots = [
+    ("ACTIVE", "Active Element", "Mirror across the active element", "PIVOT_ACTIVE", 1),
+    ("MEDIAN", "Median Point", "Mirror across the selection median", "PIVOT_MEDIAN", 2),
+    ("ORIGIN", "Object Origin", "Mirror across the object origin", "OBJECT_ORIGIN", 3),
+    ("CURSOR", "3D Cursor", "Mirror across the 3D cursor", "PIVOT_CURSOR", 4),
+]
+
+
 class Mirror(bpy.types.PropertyGroup):
     mode: bpy.props.EnumProperty(
         name="Type", description="Type of the operation", items=modes, default="MIRROR"
@@ -270,4 +293,48 @@ class Mirror(bpy.types.PropertyGroup):
     )
 
 
-classes = (Mirror,)
+class MirrorMesh(bpy.types.PropertyGroup):
+    orientation: bpy.props.EnumProperty(
+        name="Orientation",
+        description="Orientation of the mirror plane",
+        items=mesh_orientations,
+        default="NORMAL",
+    )
+
+    pivot: bpy.props.EnumProperty(
+        name="Pivot",
+        description="Location of the mirror plane",
+        items=mesh_pivots,
+        default="MEDIAN",
+    )
+
+    merge: bpy.props.BoolProperty(
+        name="Merge",
+        description="Weld the mirrored geometry to the original at the seam",
+        default=True,
+    )
+
+    merge_threshold: bpy.props.FloatProperty(
+        name="Merge Distance",
+        description="Distance within which mirrored vertices are merged at the seam",
+        default=0.0001,
+        min=0.0,
+        soft_max=1.0,
+        precision=5,
+        unit="LENGTH",
+    )
+
+    tool_fallback: bpy.props.BoolProperty(
+        name="Tool Fallback",
+        description="Return to previous tool after the mirror operation",
+        default=True,
+    )
+
+    reverse_controls: bpy.props.BoolProperty(
+        name="Reverse Controls",
+        description="Reverse axis directions (X becomes -X, -X becomes X, etc.)",
+        default=False,
+    )
+
+
+classes = (Mirror, MirrorMesh)

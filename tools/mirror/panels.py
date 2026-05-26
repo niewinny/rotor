@@ -215,6 +215,61 @@ class ROTOR_PT_MirrorOptions(bpy.types.Panel):
         sub.prop(rotor, "use_mirror_udim")
 
 
+class ROTOR_PT_MeshOrientation(bpy.types.Panel):
+    bl_label = "Orientation"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "WINDOW"
+    bl_description = ""
+    bl_context = "mesh_edit"
+
+    def draw(self, context):
+        layout = self.layout
+        mesh = addon.pref().tools.mesh
+
+        layout.use_property_split = False
+        col = layout.column(align=True)
+        col.scale_y = 1.6
+        col.prop(mesh, "orientation", expand=True)
+
+
+class ROTOR_PT_MeshPivot(bpy.types.Panel):
+    bl_label = "Pivot"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "WINDOW"
+    bl_description = ""
+    bl_context = "mesh_edit"
+
+    def draw(self, context):
+        layout = self.layout
+        mesh = addon.pref().tools.mesh
+
+        layout.use_property_split = False
+        col = layout.column(align=True)
+        col.scale_y = 1.6
+        col.prop(mesh, "pivot", expand=True)
+
+
+class ROTOR_PT_MeshOptions(bpy.types.Panel):
+    bl_label = "Tool Options"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "WINDOW"
+    bl_description = "Mirror options"
+    bl_context = "mesh_edit"
+    bl_ui_units_x = 12
+
+    def draw(self, context):
+        layout = self.layout
+        mesh = addon.pref().tools.mesh
+
+        layout.use_property_split = True
+        col = layout.column(align=True)
+
+        col.prop(mesh, "merge")
+        row = col.row(align=True)
+        row.enabled = mesh.merge
+        row.prop(mesh, "merge_threshold")
+
+
 classes = (
     ROTOR_PT_Element,
     ROTOR_PT_Type,
@@ -222,4 +277,7 @@ classes = (
     ROTOR_PT_Orientation,
     ROTOR_PT_ToolOptions,
     ROTOR_PT_MirrorOptions,
+    ROTOR_PT_MeshOrientation,
+    ROTOR_PT_MeshPivot,
+    ROTOR_PT_MeshOptions,
 )

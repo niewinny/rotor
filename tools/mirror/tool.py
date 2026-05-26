@@ -66,3 +66,55 @@ class ROTOR_MT_Mirror(bpy.types.WorkSpaceTool):
         mirror_opts = sub.row(align=True)
         mirror_opts.enabled = not rotor.real
         mirror_opts.popover("ROTOR_PT_MirrorOptions", text="", icon="MOD_MIRROR")
+
+
+class ROTOR_MT_MirrorMesh(bpy.types.WorkSpaceTool):
+    bl_space_type = "VIEW_3D"
+    bl_context_mode = "EDIT_MESH"
+    bl_idname = "mirror.mirror_mesh_tool"
+    bl_label = "Mirror"
+    bl_description = (
+        f"v: {addon.version}\n\nTool for mirroring (symmetrizing) mesh geometry"
+        "\n • Dots mirror the full mesh\n • Handles mirror the selection"
+    )
+    bl_widget = "ROTOR_GGT_MirrorMeshGizmoGroup"
+    bl_icon = (Path(__file__).parent.parent.parent / "icons" / "mirror").as_posix()
+    bl_keymap = (("mirror.fallback_tool", {"type": "ESC", "value": "PRESS"}, None),)
+
+    def draw_settings(context, layout, tool):
+        mesh = addon.pref().tools.mesh
+        row = layout.row(align=True)
+
+        row.label(text="Mirror:")
+        row.prop(mesh, "merge", text="Merge")
+        row.separator()
+        row.prop(mesh, "tool_fallback", text="Tool Fallback")
+
+        row.separator_spacer()
+
+        label, icon = "Global", "ORIENTATION_GLOBAL"
+        match mesh.orientation:
+            case "GLOBAL":
+                label, icon = ("Global", "ORIENTATION_GLOBAL")
+            case "LOCAL":
+                label, icon = ("Local", "ORIENTATION_LOCAL")
+            case "CURSOR":
+                label, icon = ("Cursor", "ORIENTATION_CURSOR")
+            case "NORMAL":
+                label, icon = ("Normal", "ORIENTATION_NORMAL")
+        row.popover("ROTOR_PT_MeshOrientation", text=label, icon=icon)
+
+        icon = "PIVOT_MEDIAN"
+        match mesh.pivot:
+            case "ACTIVE":
+                icon = "PIVOT_ACTIVE"
+            case "MEDIAN":
+                icon = "PIVOT_MEDIAN"
+            case "ORIGIN":
+                icon = "OBJECT_ORIGIN"
+            case "CURSOR":
+                icon = "PIVOT_CURSOR"
+        row.popover("ROTOR_PT_MeshPivot", text="", icon=icon)
+        row.separator()
+        sub = row.row(align=True)
+        sub.popover("ROTOR_PT_MeshOptions", text="", icon="EMPTY_AXIS")
