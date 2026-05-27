@@ -35,21 +35,9 @@ def register():
             separator=False,
             after={"object.bout_block_obj"},
         )
-        register_tool(
-            tools.align.ROTOR_MT_Align,
-            group=False,
-            separator=False,
-            after={"mirror.mirror_tool"},
-        )
     else:
         # Default: use separator
         register_tool(tools.mirror.ROTOR_MT_Mirror, group=True, separator=True)
-        register_tool(
-            tools.align.ROTOR_MT_Align,
-            group=False,
-            separator=False,
-            after={"mirror.mirror_tool"},
-        )
 
     # Edit-mesh mirror tool (separate context mode)
     register_tool(tools.mirror.ROTOR_MT_MirrorMesh, group=False, separator=True)
@@ -62,7 +50,6 @@ def unregister():
     keymap.unregister()
 
     unregister_tool(tools.mirror.ROTOR_MT_MirrorMesh)
-    unregister_tool(tools.align.ROTOR_MT_Align)
     unregister_tool(tools.mirror.ROTOR_MT_Mirror)
 
     for cls in reversed(classes):
