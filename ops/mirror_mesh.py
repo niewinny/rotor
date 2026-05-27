@@ -33,6 +33,12 @@ class ROTOR_OT_MirrorMesh(bpy.types.Operator):
     )
 
     @classmethod
+    def description(cls, context, properties):
+        if properties.target == "MESH":
+            return "Mirror the full mesh across the gizmo plane"
+        return "Mirror the selected mesh across the gizmo plane"
+
+    @classmethod
     def poll(cls, context):
         return (
             context.mode == "EDIT_MESH"

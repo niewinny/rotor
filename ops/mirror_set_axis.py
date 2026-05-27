@@ -13,7 +13,7 @@ from .mirror_props import ROTOR_PG_MirrorObjectItem
 
 
 class ROTOR_OT_SetMirrorAxis(bpy.types.Operator):
-    """Mirror axis"""
+    """Add or modify the pinned mirror"""
 
     bl_idname = "mirror.set_mirror_axis"
     bl_label = "Mirror Axis"
