@@ -31,13 +31,13 @@ def register():
         # Place under Blockout without separator
         register_tool(
             tools.mirror.ROTOR_MT_Mirror,
-            group=True,
+            group=False,
             separator=False,
             after={"object.bout_block_obj"},
         )
     else:
         # Default: use separator
-        register_tool(tools.mirror.ROTOR_MT_Mirror, group=True, separator=True)
+        register_tool(tools.mirror.ROTOR_MT_Mirror, group=False, separator=True)
 
     # Edit-mesh mirror tool (separate context mode)
     register_tool(tools.mirror.ROTOR_MT_MirrorMesh, group=False, separator=True)
