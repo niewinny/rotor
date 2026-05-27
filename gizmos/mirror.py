@@ -1,5 +1,5 @@
 import bpy
-from mathutils import Vector, Matrix
+from mathutils import Euler, Matrix, Vector
 from ..utils import addon
 
 # Helper: axis info for
@@ -240,7 +240,9 @@ class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
             axis, sign = tag[0].lower(), 1 if tag[1] == "+" else -1
             axis_vec = self._axis_vector(axis, sign)
             axis_world = (
-                mat @ axis_vec if orientation in ("LOCAL", "CURSOR") else axis_vec
+                mat @ axis_vec
+                if orientation in ("LOCAL", "CURSOR", "CUSTOM")
+                else axis_vec
             )
             dot = self._get_dot(
                 camera_pos, origin, axis_world, view_direction, use_perspective
@@ -252,6 +254,9 @@ class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
                 arrow_m = rot_mat @ arrow_m
             elif orientation == "CURSOR":
                 rot_mat = context.scene.cursor.rotation_euler.to_matrix().to_4x4()
+                arrow_m = rot_mat @ arrow_m
+            elif orientation == "CUSTOM":
+                rot_mat = Euler(mirror_tool.custom_rotation, "XYZ").to_matrix().to_4x4()
                 arrow_m = rot_mat @ arrow_m
             arrow_m.translation = origin
             gz_arrow.matrix_basis = arrow_m
@@ -268,7 +273,9 @@ class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
             axis, sign = tag[0].lower(), 1 if tag[1] == "+" else -1
             axis_vec = self._axis_vector(axis, sign)
             axis_world = (
-                mat @ axis_vec if orientation in ("LOCAL", "CURSOR") else axis_vec
+                mat @ axis_vec
+                if orientation in ("LOCAL", "CURSOR", "CUSTOM")
+                else axis_vec
             )
             dot = self._get_dot(
                 camera_pos, origin, axis_world, view_direction, use_perspective
@@ -280,6 +287,9 @@ class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
                 arrow_m = rot_mat @ arrow_m
             elif orientation == "CURSOR":
                 rot_mat = context.scene.cursor.rotation_euler.to_matrix().to_4x4()
+                arrow_m = rot_mat @ arrow_m
+            elif orientation == "CUSTOM":
+                rot_mat = Euler(mirror_tool.custom_rotation, "XYZ").to_matrix().to_4x4()
                 arrow_m = rot_mat @ arrow_m
             arrow_m.translation = origin
             gz_arrow.matrix_basis = arrow_m
@@ -296,7 +306,9 @@ class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
             axis, sign = tag[0].lower(), 1 if tag[1] == "+" else -1
             axis_vec = self._axis_vector(axis, sign)
             axis_world = (
-                mat @ axis_vec if orientation in ("LOCAL", "CURSOR") else axis_vec
+                mat @ axis_vec
+                if orientation in ("LOCAL", "CURSOR", "CUSTOM")
+                else axis_vec
             )
             dot = self._get_dot(
                 camera_pos, origin, axis_world, view_direction, use_perspective
@@ -310,6 +322,9 @@ class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
                 box_m = rot_mat @ box_m
             elif orientation == "CURSOR":
                 rot_mat = context.scene.cursor.rotation_euler.to_matrix().to_4x4()
+                box_m = rot_mat @ box_m
+            elif orientation == "CUSTOM":
+                rot_mat = Euler(mirror_tool.custom_rotation, "XYZ").to_matrix().to_4x4()
                 box_m = rot_mat @ box_m
             box_m.translation = origin
             gz_box.matrix_basis = box_m
@@ -328,6 +343,8 @@ class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
             return context.active_object.matrix_world.translation
         elif pivot == "CURSOR":
             return context.scene.cursor.location
+        elif pivot == "CUSTOM":
+            return Vector(addon.pref().tools.mirror.custom_location)
         elif context.active_object:
             return context.active_object.matrix_world.translation
         return Vector((0, 0, 0))
@@ -339,6 +356,8 @@ class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
             return context.active_object.matrix_world.to_3x3().normalized()
         elif orientation == "CURSOR":
             return context.scene.cursor.rotation_euler.to_matrix()
+        elif orientation == "CUSTOM":
+            return Euler(addon.pref().tools.mirror.custom_rotation, "XYZ").to_matrix()
         return Matrix.Identity(3)
 
     def _get_camera_info(self, context, origin):

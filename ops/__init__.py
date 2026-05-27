@@ -5,6 +5,8 @@ from . import (
     mirror_add_axis,
     mirror_add_collection,
     mirror_mesh,
+    mirror_custom_plane,
+    mirror_set_orientation,
     mirror_fallback_tool,
     set_tool,
 )
@@ -34,6 +36,8 @@ classes = (
     *mirror_add_axis.classes,
     *mirror_add_collection.classes,
     *mirror_mesh.classes,
+    *mirror_custom_plane.classes,
+    *mirror_set_orientation.classes,
     *mirror_fallback_tool.classes,
     *set_tool.classes,
 )

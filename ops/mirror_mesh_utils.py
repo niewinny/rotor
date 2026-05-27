@@ -1,5 +1,5 @@
 import bmesh
-from mathutils import Matrix, Vector
+from mathutils import Euler, Matrix, Vector
 
 from ..utils import addon
 
@@ -307,6 +307,8 @@ def get_mesh_mirror_frame(context):
         world_pivot = mw.translation.copy()
     elif pref.pivot == "CURSOR":
         world_pivot = context.scene.cursor.location.copy()
+    elif pref.pivot == "CUSTOM":
+        world_pivot = Vector(pref.custom_location)
     elif pref.pivot == "ACTIVE":
         active = bm.select_history.active
         if isinstance(active, bmesh.types.BMFace):
@@ -330,6 +332,8 @@ def get_mesh_mirror_frame(context):
         frame = mw3.normalized()
     elif orientation == "CURSOR":
         frame = context.scene.cursor.matrix.to_3x3().normalized()
+    elif orientation == "CUSTOM":
+        frame = Euler(pref.custom_rotation, "XYZ").to_matrix()
     else:  # NORMAL
         frame = _build_normal_frame(bm, mw, pref.pivot == "ACTIVE")
         if frame is None:

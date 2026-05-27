@@ -10,10 +10,25 @@ class ROTOR_MT_Mirror(bpy.types.WorkSpaceTool):
     bl_context_mode = "OBJECT"
     bl_idname = "mirror.mirror_tool"
     bl_label = "Mirror"
-    bl_description = f"v: {addon.version}\n\nTool for mirroring geometry\n • ALT + X - Call mirror gizmo"
+    bl_description = (
+        f"v: {addon.version}\n\nTool for mirroring geometry"
+        "\n • ALT + X - Call mirror gizmo"
+        "\n • SPACE - Pick custom plane"
+        "\n • TAB - Cycle orientation"
+        "\n • CTRL + TAB - Cycle pivot"
+    )
     bl_widget = "ROTOR_GGT_MirrorGizmoGroup"
     bl_icon = (Path(__file__).parent.parent.parent / "icons" / "mirror").as_posix()
-    bl_keymap = (("mirror.fallback_tool", {"type": "ESC", "value": "PRESS"}, None),)
+    bl_keymap = (
+        ("mirror.fallback_tool", {"type": "ESC", "value": "PRESS"}, None),
+        (
+            "mirror.pick_custom_plane",
+            {"type": "SPACE", "value": "PRESS"},
+            {"properties": [("target", "BOTH")]},
+        ),
+        ("mirror.set_orientation", {"type": "TAB", "value": "PRESS"}, {"properties": [("cycle", True)]}),
+        ("mirror.set_pivot", {"type": "TAB", "value": "PRESS", "ctrl": True}, {"properties": [("cycle", True)]}),
+    )
 
     def draw_settings(context, layout, tool):
         rotor = addon.pref().tools.mirror
@@ -46,6 +61,8 @@ class ROTOR_MT_Mirror(bpy.types.WorkSpaceTool):
                 label, icon = ("Local", "ORIENTATION_LOCAL")
             case "CURSOR":
                 label, icon = ("Cursor", "ORIENTATION_CURSOR")
+            case "CUSTOM":
+                label, icon = ("Custom", "OBJECT_ORIGIN")
         row.popover("ROTOR_PT_Orientation", text=label, icon=icon)
 
         label = "None"
@@ -59,6 +76,8 @@ class ROTOR_MT_Mirror(bpy.types.WorkSpaceTool):
                 label, icon = ("World", "WORLD")
             case "CURSOR":
                 label, icon = ("Cursor", "CURSOR")
+            case "CUSTOM":
+                label, icon = ("Custom", "OBJECT_ORIGIN")
         row.popover("ROTOR_PT_Pivot", text="", icon=icon)
         row.separator()
         sub = row.row(align=True)
@@ -76,10 +95,22 @@ class ROTOR_MT_MirrorMesh(bpy.types.WorkSpaceTool):
     bl_description = (
         f"v: {addon.version}\n\nTool for mirroring (symmetrizing) mesh geometry"
         "\n • Dots mirror the full mesh\n • Handles mirror the selection"
+        "\n • SPACE - Pick custom plane"
+        "\n • TAB - Cycle orientation"
+        "\n • CTRL + TAB - Cycle pivot"
     )
     bl_widget = "ROTOR_GGT_MirrorMeshGizmoGroup"
     bl_icon = (Path(__file__).parent.parent.parent / "icons" / "mirror").as_posix()
-    bl_keymap = (("mirror.fallback_tool", {"type": "ESC", "value": "PRESS"}, None),)
+    bl_keymap = (
+        ("mirror.fallback_tool", {"type": "ESC", "value": "PRESS"}, None),
+        (
+            "mirror.pick_custom_plane",
+            {"type": "SPACE", "value": "PRESS"},
+            {"properties": [("target", "BOTH")]},
+        ),
+        ("mirror.set_orientation", {"type": "TAB", "value": "PRESS"}, {"properties": [("cycle", True)]}),
+        ("mirror.set_pivot", {"type": "TAB", "value": "PRESS", "ctrl": True}, {"properties": [("cycle", True)]}),
+    )
 
     def draw_settings(context, layout, tool):
         mesh = addon.pref().tools.mesh
@@ -102,6 +133,8 @@ class ROTOR_MT_MirrorMesh(bpy.types.WorkSpaceTool):
                 label, icon = ("Cursor", "ORIENTATION_CURSOR")
             case "NORMAL":
                 label, icon = ("Normal", "ORIENTATION_NORMAL")
+            case "CUSTOM":
+                label, icon = ("Custom", "OBJECT_ORIGIN")
         row.popover("ROTOR_PT_MeshOrientation", text=label, icon=icon)
 
         icon = "PIVOT_MEDIAN"
@@ -114,6 +147,8 @@ class ROTOR_MT_MirrorMesh(bpy.types.WorkSpaceTool):
                 icon = "OBJECT_ORIGIN"
             case "CURSOR":
                 icon = "PIVOT_CURSOR"
+            case "CUSTOM":
+                icon = "OBJECT_ORIGIN"
         row.popover("ROTOR_PT_MeshPivot", text="", icon=icon)
         row.separator()
         sub = row.row(align=True)

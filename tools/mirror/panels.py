@@ -53,6 +53,12 @@ class ROTOR_PT_Pivot(bpy.types.Panel):
         col.scale_y = 1.6
         col.prop(rotor, "pivot", expand=True)
 
+        if rotor.pivot == "CUSTOM":
+            sub = layout.column(align=True)
+            sub.prop(rotor, "custom_location", text="Location")
+            op = sub.operator("mirror.pick_custom_plane", text="Pick", icon="EYEDROPPER")
+            op.target = "PIVOT"
+
 
 class ROTOR_PT_Orientation(bpy.types.Panel):
     bl_label = "Type"
@@ -69,6 +75,12 @@ class ROTOR_PT_Orientation(bpy.types.Panel):
         col = layout.column(align=True)
         col.scale_y = 1.6
         col.prop(rotor, "orientation", expand=True)
+
+        if rotor.orientation == "CUSTOM":
+            sub = layout.column(align=True)
+            sub.prop(rotor, "custom_rotation", text="Rotation")
+            op = sub.operator("mirror.pick_custom_plane", text="Pick", icon="EYEDROPPER")
+            op.target = "ORIENTATION"
 
 
 class ROTOR_PT_ToolOptions(bpy.types.Panel):
@@ -231,6 +243,12 @@ class ROTOR_PT_MeshOrientation(bpy.types.Panel):
         col.scale_y = 1.6
         col.prop(mesh, "orientation", expand=True)
 
+        if mesh.orientation == "CUSTOM":
+            sub = layout.column(align=True)
+            sub.prop(mesh, "custom_rotation", text="Rotation")
+            op = sub.operator("mirror.pick_custom_plane", text="Pick", icon="EYEDROPPER")
+            op.target = "ORIENTATION"
+
 
 class ROTOR_PT_MeshPivot(bpy.types.Panel):
     bl_label = "Pivot"
@@ -247,6 +265,12 @@ class ROTOR_PT_MeshPivot(bpy.types.Panel):
         col = layout.column(align=True)
         col.scale_y = 1.6
         col.prop(mesh, "pivot", expand=True)
+
+        if mesh.pivot == "CUSTOM":
+            sub = layout.column(align=True)
+            sub.prop(mesh, "custom_location", text="Location")
+            op = sub.operator("mirror.pick_custom_plane", text="Pick", icon="EYEDROPPER")
+            op.target = "PIVOT"
 
 
 class ROTOR_PT_MeshOptions(bpy.types.Panel):

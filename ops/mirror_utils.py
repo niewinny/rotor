@@ -1,6 +1,6 @@
 import bpy
 import bmesh
-from mathutils import Matrix, Vector
+from mathutils import Euler, Matrix, Vector
 from ..utils import addon
 
 
@@ -70,6 +70,29 @@ def get_mirror_object(context, obj, pivot, orientation):
                 context,
                 context.scene.cursor.location,
                 orientation=context.scene.cursor.rotation_euler,
+            )
+        case ("CUSTOM", orient):
+            pref = addon.pref().tools.mirror
+            loc = Vector(pref.custom_location)
+            if orient == "LOCAL":
+                rot = obj.rotation_euler
+            elif orient == "CURSOR":
+                rot = context.scene.cursor.rotation_euler
+            elif orient == "CUSTOM":
+                rot = pref.custom_rotation
+            else:  # GLOBAL
+                rot = (0.0, 0.0, 0.0)
+            mirror_object = create_empty_mirror_object(context, loc, orientation=rot)
+        case (piv, "CUSTOM"):
+            pref = addon.pref().tools.mirror
+            if piv == "WORLD":
+                loc = Vector((0.0, 0.0, 0.0))
+            elif piv == "CURSOR":
+                loc = context.scene.cursor.location.copy()
+            else:  # ACTIVE or INDIVIDUAL -> object origin
+                loc = obj.location.copy()
+            mirror_object = create_empty_mirror_object(
+                context, loc, orientation=pref.custom_rotation
             )
 
     return mirror_object, individual
@@ -172,6 +195,8 @@ def bisect_object(obj, axis_idx, pivot, orientation, context, is_neg=False):
         pivot_point = obj.location.copy()
     elif pivot == "CURSOR":
         pivot_point = context.scene.cursor.location.copy()
+    elif pivot == "CUSTOM":
+        pivot_point = Vector(addon.pref().tools.mirror.custom_location)
     else:
         pivot_point = Vector((0, 0, 0))
 
@@ -197,6 +222,10 @@ def bisect_object(obj, axis_idx, pivot, orientation, context, is_neg=False):
     elif orientation == "CURSOR":
         # Use cursor's rotation to transform the normal regardless of pivot
         rot_mat = context.scene.cursor.rotation_euler.to_matrix()
+        obj_normal = rot_mat @ obj_normal
+    elif orientation == "CUSTOM":
+        # Use the custom orientation to transform the normal regardless of pivot
+        rot_mat = Euler(addon.pref().tools.mirror.custom_rotation, "XYZ").to_matrix()
         obj_normal = rot_mat @ obj_normal
 
     # Create new bmesh from mesh
@@ -265,6 +294,8 @@ def create_real_mirror(context, obj, axis_idx, is_neg):
         pivot_point = obj.location.copy()
     elif pivot == "CURSOR":
         pivot_point = context.scene.cursor.location.copy()
+    elif pivot == "CUSTOM":
+        pivot_point = Vector(addon.pref().tools.mirror.custom_location)
     else:
         pivot_point = Vector((0, 0, 0))
 
@@ -275,10 +306,12 @@ def create_real_mirror(context, obj, axis_idx, is_neg):
             rot_mat = context.active_object.rotation_euler.to_matrix().to_4x4()
         elif pivot == "INDIVIDUAL":
             rot_mat = obj.rotation_euler.to_matrix().to_4x4()
-        elif pivot in ("WORLD", "CURSOR"):
+        elif pivot in ("WORLD", "CURSOR", "CUSTOM"):
             rot_mat = obj.rotation_euler.to_matrix().to_4x4()
     elif orientation == "CURSOR":
         rot_mat = context.scene.cursor.rotation_euler.to_matrix().to_4x4()
+    elif orientation == "CUSTOM":
+        rot_mat = Euler(addon.pref().tools.mirror.custom_rotation, "XYZ").to_matrix().to_4x4()
 
     # 5. Compose mirror_xform = T @ R @ S @ R_inv @ T_inv
     T = Matrix.Translation(pivot_point)

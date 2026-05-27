@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 import bpy
-from .draw import GhostDraw, GuideDraw
+from .draw import GhostDraw, GuideDraw, PlanePreviewDraw
 
 
 draw_handlers = []
@@ -46,6 +46,21 @@ class Ghost(Handle):
         """Create a ghost draw handler for the given object."""
         self.callback = GhostDraw()
         self.callback.set_object(obj)
+        self.handle = bpy.types.SpaceView3D.draw_handler_add(
+            self.callback.draw, (context,), "WINDOW", "POST_VIEW"
+        )
+        draw_handlers.append(self.handle)
+
+
+@dataclass
+class PlanePreview(Handle):
+    """Dataclass for the custom-plane preview draw handler."""
+
+    callback: PlanePreviewDraw | None = None
+
+    def create(self, context):
+        """Create a plane-preview draw handler."""
+        self.callback = PlanePreviewDraw()
         self.handle = bpy.types.SpaceView3D.draw_handler_add(
             self.callback.draw, (context,), "WINDOW", "POST_VIEW"
         )

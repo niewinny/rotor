@@ -23,6 +23,7 @@ pivots = [
     ),
     ("WORLD", "World Center", "Mirror Across World Center", "WORLD", 3),
     ("CURSOR", "Cursor", "Mirror Across 3D Cursor", "CURSOR", 4),
+    ("CUSTOM", "Custom", "Mirror across a custom point", "OBJECT_ORIGIN", 5),
 ]
 
 
@@ -30,6 +31,7 @@ orientations = [
     ("GLOBAL", "Global", "Mirror using Global orientation", "ORIENTATION_GLOBAL", 1),
     ("LOCAL", "Local", "Mirror using Local orientation", "ORIENTATION_LOCAL", 2),
     ("CURSOR", "Cursor", "Mirror using 3D Cursor orientation", "ORIENTATION_CURSOR", 3),
+    ("CUSTOM", "Custom", "Mirror using a custom orientation", "OBJECT_ORIGIN", 4),
 ]
 
 
@@ -45,6 +47,7 @@ mesh_orientations = [
         "ORIENTATION_NORMAL",
         4,
     ),
+    ("CUSTOM", "Custom", "Mirror using a custom orientation", "OBJECT_ORIGIN", 5),
 ]
 
 
@@ -53,6 +56,7 @@ mesh_pivots = [
     ("MEDIAN", "Median Point", "Mirror across the selection median", "PIVOT_MEDIAN", 2),
     ("ORIGIN", "Object Origin", "Mirror across the object origin", "OBJECT_ORIGIN", 3),
     ("CURSOR", "3D Cursor", "Mirror across the 3D cursor", "PIVOT_CURSOR", 4),
+    ("CUSTOM", "Custom", "Mirror across a custom point", "OBJECT_ORIGIN", 5),
 ]
 
 
@@ -80,6 +84,23 @@ class Mirror(bpy.types.PropertyGroup):
         description="Orientation of the operation",
         items=orientations,
         default="LOCAL",
+    )
+
+    # Custom plane (world space): location = custom pivot, rotation = custom orientation
+    custom_location: bpy.props.FloatVectorProperty(
+        name="Custom Location",
+        description="Custom pivot point (world space)",
+        size=3,
+        subtype="XYZ",
+        default=(0.0, 0.0, 0.0),
+    )
+
+    custom_rotation: bpy.props.FloatVectorProperty(
+        name="Custom Rotation",
+        description="Custom orientation (world space)",
+        size=3,
+        subtype="EULER",
+        default=(0.0, 0.0, 0.0),
     )
 
     real: bpy.props.BoolProperty(
@@ -306,6 +327,23 @@ class MirrorMesh(bpy.types.PropertyGroup):
         description="Location of the mirror plane",
         items=mesh_pivots,
         default="MEDIAN",
+    )
+
+    # Custom plane (world space): location = custom pivot, rotation = custom orientation
+    custom_location: bpy.props.FloatVectorProperty(
+        name="Custom Location",
+        description="Custom mirror plane location (world space)",
+        size=3,
+        subtype="XYZ",
+        default=(0.0, 0.0, 0.0),
+    )
+
+    custom_rotation: bpy.props.FloatVectorProperty(
+        name="Custom Rotation",
+        description="Custom mirror plane orientation (world space)",
+        size=3,
+        subtype="EULER",
+        default=(0.0, 0.0, 0.0),
     )
 
     merge: bpy.props.BoolProperty(

@@ -191,3 +191,77 @@ class GhostDraw(DrawBase):
         self.shader.bind()
         self.shader.uniform_float("color", self.COLOR_GHOST)
         gpu.state.blend_set("ALPHA")
+
+
+class PlanePreviewDraw(DrawBase):
+    """Draws the custom-plane preview: a Z normal arrow + an X/Y axis cross."""
+
+    def __init__(self):
+        self.shader = gpu.shader.from_builtin("POLYLINE_FLAT_COLOR")
+        self.batch = None
+        self.width = 2.0
+
+    def is_valid(self):
+        return self.batch is not None
+
+    def create_batch(self):
+        return self.batch
+
+    def clear(self):
+        self.batch = None
+
+    def update(self, location, normal, x_dir, size, colors):
+        """Rebuild the batch.
+
+        :param location: World-space plane origin.
+        :param normal: Plane normal (Z axis).
+        :param x_dir: In-plane direction (X axis); orthonormalized against Z.
+        :param size: World-space size of the cross arms (scale to taste/view).
+        :param colors: (x_color, y_color, z_color) RGBA tuples.
+        """
+        z = Vector(normal).normalized()
+        x = Vector(x_dir)
+        x = x - z * x.dot(z)
+        if x.length < 1e-6:
+            x = z.orthogonal()
+        x.normalize()
+        y = z.cross(x).normalized()
+        org = Vector(location)
+        x_color, y_color, z_color = colors
+
+        tip = org + z * (size * 1.6)
+        head = size * 0.35
+
+        verts, cols, indices = [], [], []
+        i = 0
+
+        def seg(a, b, color):
+            nonlocal i
+            verts.extend([a[:], b[:]])
+            cols.extend([color, color])
+            indices.append((i, i + 1))
+            i += 2
+
+        # X / Y cross through the origin.
+        seg(org - x * size, org + x * size, x_color)
+        seg(org - y * size, org + y * size, y_color)
+        # Z normal arrow: shaft + four-segment head.
+        seg(org, tip, z_color)
+        seg(tip, tip - z * head + x * head, z_color)
+        seg(tip, tip - z * head - x * head, z_color)
+        seg(tip, tip - z * head + y * head, z_color)
+        seg(tip, tip - z * head - y * head, z_color)
+
+        self.batch = batch_for_shader(
+            self.shader, "LINES", {"pos": verts, "color": cols}, indices=indices
+        )
+
+    def setup_draw_state(self, context):
+        gpu.state.depth_test_set("NONE")
+        self.shader.bind()
+        vp_width, vp_height = self.get_viewport_size(context)
+        self.shader.uniform_float("viewportSize", (vp_width, vp_height))
+        self.shader.uniform_float("lineWidth", self.width)
+        gpu.state.blend_set("ALPHA")
+
+

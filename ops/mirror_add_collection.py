@@ -1,6 +1,6 @@
 import bpy
 from bpy.props import CollectionProperty
-from mathutils import Matrix, Vector
+from mathutils import Euler, Matrix, Vector
 from ..utils import addon
 from .mirror_utils import bisect_object
 from .mirror_props import ROTOR_PG_MirrorCollectionItem
@@ -127,6 +127,8 @@ class ROTOR_OT_AddMirrorCollection(bpy.types.Operator):
                     pivot_point = Vector((0, 0, 0))
             elif pivot == "CURSOR":
                 pivot_point = context.scene.cursor.location.copy()
+            elif pivot == "CUSTOM":
+                pivot_point = Vector(pref.custom_location)
             else:
                 pivot_point = Vector((0, 0, 0))
 
@@ -143,8 +145,8 @@ class ROTOR_OT_AddMirrorCollection(bpy.types.Operator):
                         ]
                         avg_mat = sum(mats, Matrix()) * (1.0 / len(mats))
                         rot_mat = avg_mat
-                elif pivot in ("WORLD", "CURSOR"):
-                    # For LOCAL orientation with WORLD or CURSOR pivot, use collection objects' average rotation
+                elif pivot in ("WORLD", "CURSOR", "CUSTOM"):
+                    # For LOCAL orientation with WORLD/CURSOR/CUSTOM pivot, use collection objects' average rotation
                     objs_in_col = [o for o in col.objects if o.type == "MESH"]
                     if objs_in_col:
                         mats = [
@@ -155,6 +157,9 @@ class ROTOR_OT_AddMirrorCollection(bpy.types.Operator):
             elif orientation == "CURSOR":
                 # CURSOR orientation uses cursor rotation regardless of pivot
                 rot_mat = context.scene.cursor.rotation_euler.to_matrix().to_4x4()
+            elif orientation == "CUSTOM":
+                # CUSTOM orientation uses the custom rotation regardless of pivot
+                rot_mat = Euler(pref.custom_rotation, "XYZ").to_matrix().to_4x4()
             # For GLOBAL orientation, rot_mat stays None
 
             T = Matrix.Translation(pivot_point)
