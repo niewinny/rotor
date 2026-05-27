@@ -12,50 +12,269 @@ def _selection(bm):
     return verts, edges, faces
 
 
-def _build_normal_frame(bm, mw3, pivot, sel_verts):
-    """Build a world-space orientation frame from the selection normal.
+# Python port of Blender's "Normal" transform orientation for edit meshes, so
+# the Mirror tool's NORMAL frame matches Blender 1:1. Mirrors getTransformOrientation_ex
+# + createSpaceNormal/createSpaceNormalTangent (editors/transform/transform_orientations.cc,
+# helpers in bmesh_marking.cc / bmesh_polygon.cc).
 
-    With ``pivot == 'ACTIVE'`` and an active face, the frame follows that face;
-    otherwise it uses the averaged normal of the selected faces (falling back to
-    the averaged vertex normal for edge/vertex selections).
+_EPS = 1e-6
 
-    Returns a 3x3 matrix whose columns are the X/Y/Z axis directions in world space.
+
+def _project(a, b):
+    d = b.dot(b)
+    if d < 1e-12:
+        return Vector((0.0, 0.0, 0.0))
+    return b * (a.dot(b) / d)
+
+
+def _edge_exists(va, vb):
+    for e in va.link_edges:
+        if e.other_vert(va) == vb:
+            return e
+    return None
+
+
+def _tri_unique_edge_tangent(verts):
+    """Tangent along the most 'unique' edge of a triangle."""
+    difs = [0.0, 0.0, 0.0]
+    for i_prev, i_curr, i_next in ((1, 2, 0), (2, 0, 1), (0, 1, 2)):
+        co = verts[i_curr].co
+        o0 = verts[i_prev].co
+        o1 = verts[i_next].co
+        proj_dir = (o0 + o1) * 0.5 - co
+        difs[i_next] = (_project(o0, proj_dir) - _project(o1, proj_dir)).length_squared
+    index = max(range(3), key=lambda i: difs[i])
+    return (verts[index].co - verts[(index + 1) % 3].co).normalized()
+
+
+def _face_tangent_auto(f):
+    n = len(f.verts)
+    if n == 3:
+        return _tri_unique_edge_tangent([loop.vert for loop in f.loops])
+    if n == 4:
+        return f.calc_tangent_edge_pair()
+    return f.calc_tangent_edge()
+
+
+def _editselection_center(ele):
+    if isinstance(ele, bmesh.types.BMVert):
+        return ele.co.copy()
+    if isinstance(ele, bmesh.types.BMEdge):
+        return (ele.verts[0].co + ele.verts[1].co) * 0.5
+    return ele.calc_center_median()
+
+
+def _editselection_normal(ele):
+    if isinstance(ele, bmesh.types.BMVert):
+        return ele.normal.copy()
+    if isinstance(ele, bmesh.types.BMEdge):
+        normal = ele.verts[0].normal + ele.verts[1].normal
+        plane = ele.verts[1].co - ele.verts[0].co
+        vec = normal.cross(plane)
+        normal = plane.cross(vec)
+        normal.normalize()
+        return normal
+    return ele.normal.copy()
+
+
+def _editselection_plane(ele, history):
+    if isinstance(ele, bmesh.types.BMVert):
+        prev = history[-2] if len(history) >= 2 and history[-1] == ele else None
+        if prev is not None:
+            plane = _editselection_center(prev) - ele.co
+        else:
+            no = ele.normal
+            vec = Vector((0.0, 0.0, 0.0))
+            if no[0] < 0.5:
+                vec[0] = 1.0
+            elif no[1] < 0.5:
+                vec[1] = 1.0
+            else:
+                vec[2] = 1.0
+            plane = no.cross(vec)
+        plane.normalize()
+        return plane
+    if isinstance(ele, bmesh.types.BMEdge):
+        if ele.is_boundary:
+            loop = ele.link_loops[0]
+            plane = loop.vert.co - loop.link_loop_next.vert.co
+        elif ele.verts[1].co[1] > ele.verts[0].co[1]:
+            plane = ele.verts[1].co - ele.verts[0].co
+        else:
+            plane = ele.verts[0].co - ele.verts[1].co
+        plane.normalize()
+        return plane
+    return _face_tangent_auto(ele)
+
+
+def _create_space_normal(normal):
+    z = normal.normalized()
+    if z.length < _EPS:
+        return None
+    x = z.cross(Vector((0.0, 0.0, 1.0)))
+    if x.length < _EPS:
+        x = Vector((1.0, 0.0, 0.0)).cross(z)
+    x.normalize()
+    y = z.cross(x).normalized()
+    return Matrix((x, y, z)).transposed()
+
+
+def _create_space_normal_tangent(normal, tangent):
+    """Basis with Z = normal, X = cross(Z, plane), Y = cross(Z, X).
+
+    Blender stores -tangent in Y; that negation and the trailing
+    negate_v3(r_plane) in getTransformOrientation_ex cancel out.
     """
-    n_local = Vector((0.0, 0.0, 0.0))
-    t_local = None
+    z = normal.normalized()
+    if z.length < _EPS:
+        return None
+    y = -tangent
+    if y.length < _EPS:
+        y = Vector((0.0, 0.0, 1.0))
+    x = z.cross(y)
+    if x.length < _EPS:
+        return None
+    x.normalize()
+    y = z.cross(x)
+    if y.length < _EPS:
+        return None
+    y.normalize()
+    return Matrix((x, y, z)).transposed()
 
-    active = bm.select_history.active
-    if pivot == "ACTIVE" and isinstance(active, bmesh.types.BMFace):
-        n_local = active.normal.copy()
-        t_local = active.loops[0].edge.verts[1].co - active.loops[0].edge.verts[0].co
+
+def _build_normal_frame(bm, mw, around_active):
+    """World-space NORMAL orientation frame matching Blender's edit-mesh logic.
+
+    ``around_active`` reproduces ``around == V3D_AROUND_ACTIVE`` (i.e. the
+    Active Element pivot): the frame then follows the active element instead of
+    the aggregate selection. Returns a 3x3 matrix whose columns are the X/Y/Z
+    axis directions in world space, or ``None`` when no usable selection.
+    """
+    history = list(bm.select_history)
+    active = history[-1] if history else None
+
+    normal = Vector((0.0, 0.0, 0.0))
+    plane = Vector((0.0, 0.0, 0.0))
+    result = ""
+
+    if around_active and active is not None:
+        normal = _editselection_normal(active)
+        plane = _editselection_plane(active, history)
+        if isinstance(active, bmesh.types.BMVert):
+            result = "VERT"
+        elif isinstance(active, bmesh.types.BMEdge):
+            result = "EDGE"
+        else:
+            result = "FACE"
     else:
+        sel_verts = [v for v in bm.verts if v.select]
+        sel_edges = [e for e in bm.edges if e.select]
         sel_faces = [f for f in bm.faces if f.select]
+
         if sel_faces:
             for f in sel_faces:
-                n_local += f.normal
-            ref = sel_faces[0]
-            t_local = ref.loops[0].edge.verts[1].co - ref.loops[0].edge.verts[0].co
-        else:
+                normal += f.normal
+                plane += _face_tangent_auto(f)
+            result = "FACE"
+        elif len(sel_verts) == 3:
+            v_tri = sel_verts
+            edge_a = v_tri[0].co - v_tri[1].co
+            edge_b = v_tri[1].co - v_tri[2].co
+            normal = edge_a.cross(edge_b)
+            normal.normalize()
+            no_test = v_tri[0].normal + v_tri[1].normal + v_tri[2].normal
+            if no_test.dot(normal) < 0.0:
+                normal = -normal
+            e = None
+            e_len = 0.0
+            if sel_edges:
+                for j in range(3):
+                    e_test = _edge_exists(v_tri[j], v_tri[(j + 1) % 3])
+                    if e_test is not None and e_test.select:
+                        l2 = e_test.calc_length() ** 2
+                        if e is None or e_len < l2:
+                            e = e_test
+                            e_len = l2
+            if e is not None:
+                if e.is_boundary:
+                    loop = e.link_loops[0]
+                    plane = loop.vert.co - loop.link_loop_next.vert.co
+                else:
+                    plane = e.verts[0].co - e.verts[1].co
+            else:
+                plane = _tri_unique_edge_tangent(v_tri)
+            result = "FACE"
+        elif len(sel_edges) == 1 or len(sel_verts) == 2:
+            eed = sel_edges[0] if len(sel_edges) == 1 else None
+            v_pair = list(eed.verts) if eed is not None else list(sel_verts)
+            swap = False
+            if isinstance(active, bmesh.types.BMVert) and active == v_pair[1]:
+                swap = True
+            elif eed is not None and eed.is_boundary and eed.link_loops[0].vert != v_pair[0]:
+                swap = True
+            if swap:
+                v_pair[0], v_pair[1] = v_pair[1], v_pair[0]
+            normal = v_pair[1].normal + v_pair[0].normal
+            plane = v_pair[1].co - v_pair[0].co
+            if plane.length > _EPS:
+                plane.normalize()
+                # Make the normal perpendicular to the edge (local space).
+                normal = normal - plane * normal.dot(plane)
+                if normal.length < _EPS:
+                    normal = plane.orthogonal()
+            result = "EDGE"
+        elif len(sel_verts) == 1:
+            v = sel_verts[0]
+            normal = v.normal.copy()
+            edges = v.link_edges
+            if len(edges) == 2:
+                e0, e1 = edges[0], edges[1]
+                vp0 = e0.other_vert(v)
+                vp1 = e1.other_vert(v)
+                swap = False
+                if e0.is_boundary:
+                    if e0.link_loops[0].vert != v:
+                        swap = True
+                elif e0.calc_length() ** 2 < e1.calc_length() ** 2:
+                    swap = True
+                if swap:
+                    vp0, vp1 = vp1, vp0
+                plane = (v.co - vp0.co).normalized() + (vp1.co - v.co).normalized()
+            result = "EDGE" if plane.length > _EPS else "VERT"
+        elif len(sel_verts) > 3:
             for v in sel_verts:
-                n_local += v.normal
+                normal += v.normal
+            normal.normalize()
+            result = "VERT"
+        else:
+            return None
 
-    z = (mw3 @ n_local).normalized()
-    if z.length < 1e-6:
-        z = Vector((0.0, 0.0, 1.0))
+    # Trailing negate of the plane (matches getTransformOrientation_ex).
+    plane = -plane
 
-    if t_local is not None:
-        t = mw3 @ t_local
+    # Local -> world. Edges use the plain matrix; everything else uses the
+    # inverse-transpose ("normal matrix"), matching Blender exactly.
+    mw3 = mw.to_3x3()
+    if result == "EDGE":
+        normal = mw3 @ normal
+        plane = mw3 @ plane
+        # Re-project so the normal stays perpendicular to the edge (world space).
+        normal = normal - _project(normal, plane)
     else:
-        t = z.orthogonal()
+        nmat = mw3.inverted_safe().transposed()
+        normal = nmat @ normal
+        plane = nmat @ plane
 
-    # Orthonormalize the tangent against the normal
-    t = t - z * t.dot(z)
-    if t.length < 1e-6:
-        t = z.orthogonal()
-    x = t.normalized()
-    y = z.cross(x).normalized()
+    normal.normalize()
+    plane.normalize()
 
-    return Matrix((x, y, z)).transposed()
+    # ORIENTATION_USE_PLANE: EDGE/FACE need a tangent; fall back to VERT if none.
+    if result in {"EDGE", "FACE"} and plane.length < _EPS:
+        result = "VERT"
+
+    if result == "VERT":
+        return _create_space_normal(normal)
+    return _create_space_normal_tangent(normal, plane)
 
 
 def get_mesh_mirror_frame(context):
@@ -112,7 +331,9 @@ def get_mesh_mirror_frame(context):
     elif orientation == "CURSOR":
         frame = context.scene.cursor.matrix.to_3x3().normalized()
     else:  # NORMAL
-        frame = _build_normal_frame(bm, mw3, pref.pivot, sel_verts)
+        frame = _build_normal_frame(bm, mw, pref.pivot == "ACTIVE")
+        if frame is None:
+            frame = Matrix.Identity(3)
 
     return world_pivot, frame
 
