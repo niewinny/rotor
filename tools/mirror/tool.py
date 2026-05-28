@@ -14,8 +14,8 @@ class ROTOR_MT_Mirror(bpy.types.WorkSpaceTool):
         f"v: {addon.version}\n\nTool for mirroring geometry"
         "\n • ALT + X - Call mirror gizmo"
         "\n • SPACE - Pick custom plane"
-        "\n • TAB - Cycle orientation"
-        "\n • CTRL + TAB - Cycle pivot"
+        "\n • Q - Cycle orientation"
+        "\n • E - Cycle pivot"
     )
     bl_widget = "ROTOR_GGT_MirrorGizmoGroup"
     bl_icon = (Path(__file__).parent.parent.parent / "icons" / "mirror").as_posix()
@@ -26,8 +26,8 @@ class ROTOR_MT_Mirror(bpy.types.WorkSpaceTool):
             {"type": "SPACE", "value": "PRESS"},
             {"properties": [("target", "BOTH")]},
         ),
-        ("mirror.set_orientation", {"type": "TAB", "value": "PRESS"}, {"properties": [("cycle", True)]}),
-        ("mirror.set_pivot", {"type": "TAB", "value": "PRESS", "ctrl": True}, {"properties": [("cycle", True)]}),
+        ("mirror.set_orientation", {"type": "Q", "value": "PRESS"}, {"properties": [("cycle", True)]}),
+        ("mirror.set_pivot", {"type": "E", "value": "PRESS"}, {"properties": [("cycle", True)]}),
     )
 
     def draw_settings(context, layout, tool):
@@ -96,8 +96,8 @@ class ROTOR_MT_MirrorMesh(bpy.types.WorkSpaceTool):
         f"v: {addon.version}\n\nTool for mirroring (symmetrizing) mesh geometry"
         "\n • Dots mirror the full mesh\n • Handles mirror the selection"
         "\n • SPACE - Pick custom plane"
-        "\n • TAB - Cycle orientation"
-        "\n • CTRL + TAB - Cycle pivot"
+        "\n • Q - Cycle orientation"
+        "\n • E - Cycle pivot"
     )
     bl_widget = "ROTOR_GGT_MirrorMeshGizmoGroup"
     bl_icon = (Path(__file__).parent.parent.parent / "icons" / "mirror").as_posix()
@@ -108,8 +108,8 @@ class ROTOR_MT_MirrorMesh(bpy.types.WorkSpaceTool):
             {"type": "SPACE", "value": "PRESS"},
             {"properties": [("target", "BOTH")]},
         ),
-        ("mirror.set_orientation", {"type": "TAB", "value": "PRESS"}, {"properties": [("cycle", True)]}),
-        ("mirror.set_pivot", {"type": "TAB", "value": "PRESS", "ctrl": True}, {"properties": [("cycle", True)]}),
+        ("mirror.set_orientation", {"type": "Q", "value": "PRESS"}, {"properties": [("cycle", True)]}),
+        ("mirror.set_pivot", {"type": "E", "value": "PRESS"}, {"properties": [("cycle", True)]}),
     )
 
     def draw_settings(context, layout, tool):
