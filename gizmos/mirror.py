@@ -1,6 +1,11 @@
 import bpy
 from mathutils import Euler, Matrix, Vector
 from ..utils import addon
+from ..ops.mirror_chisel import (
+    is_chisel_object,
+    get_chisel_mirror_item,
+    chisel_axis_state,
+)
 
 # Helper: axis info for
 alpha = 0.8
@@ -135,21 +140,34 @@ class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
             active_mesh = selected_meshes[0] if selected_meshes else None
 
         if active_mesh:
-            # Find last pinned mirror modifier (iterate in reverse to get the most recent)
-            mirror_mod = None
-            for mod in reversed(active_mesh.modifiers):
-                if mod.type == "MIRROR" and mod.use_pin_to_last:
-                    mirror_mod = mod
-                    break
-            if mirror_mod:
+            axis_state = None
+            if is_chisel_object(active_mesh):
+                # Chisel objects: read the last chisel mirror item instead
+                chisel_item, _ = get_chisel_mirror_item(active_mesh)
+                if chisel_item:
+                    axis_state = chisel_axis_state(chisel_item)
+            else:
+                # Find last pinned mirror modifier (iterate in reverse to get the most recent)
+                mirror_mod = None
+                for mod in reversed(active_mesh.modifiers):
+                    if mod.type == "MIRROR" and mod.use_pin_to_last:
+                        mirror_mod = mod
+                        break
+                if mirror_mod:
+                    axis_state = (
+                        mirror_mod.use_axis,
+                        mirror_mod.use_bisect_flip_axis,
+                    )
+            if axis_state is not None:
+                use_axis, use_flip = axis_state
                 # Start with all gray, only color used axes
                 for i, (pos_idx, neg_idx) in enumerate([(0, 1), (2, 3), (4, 5)]):
                     axis_color = getattr(theme_axis, "xyz"[i])
-                    if mirror_mod.use_axis[i]:
+                    if use_axis[i]:
                         # Swap indices when reverse_controls is enabled
                         if reverse_controls:
                             pos_idx, neg_idx = neg_idx, pos_idx
-                        if mirror_mod.use_bisect_flip_axis[i]:
+                        if use_flip[i]:
                             # Negative axis (X-, Y-, Z-)
                             arrow_colors[neg_idx] = axis_color
                         else:

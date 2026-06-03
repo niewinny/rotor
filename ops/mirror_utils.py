@@ -258,25 +258,15 @@ def bisect_object(obj, axis_idx, pivot, orientation, context, is_neg=False):
     obj.data.update()
 
 
-def create_real_mirror(context, obj, axis_idx, is_neg):
-    """Duplicate object + mesh and flip across the mirror axis.
-
-    Returns the new object or None if the object type is unsupported.
-    """
+def compute_mirror_xform(context, obj, axis_idx):
+    """Return the 4x4 mirror transform (T @ R @ S @ R_inv @ T_inv) for the
+    current pivot/orientation preferences. Shared by the mesh and chisel
+    real-mirror paths."""
     pref = addon.pref().tools.mirror
     pivot = pref.pivot
     orientation = pref.orientation
 
-    # 1. Duplicate object and mesh data
-    new_obj = obj.copy()
-    if obj.data:
-        new_obj.data = obj.data.copy()
-
-    # Link to same collections
-    for col in obj.users_collection:
-        col.objects.link(new_obj)
-
-    # 2. Build scale matrix with -1 on mirror axis
+    # 1. Build scale matrix with -1 on mirror axis
     scale_vec = [1.0, 1.0, 1.0]
     scale_vec[axis_idx] = -1.0
     mirror_mat = (
@@ -285,7 +275,7 @@ def create_real_mirror(context, obj, axis_idx, is_neg):
         @ Matrix.Scale(scale_vec[2], 4, Vector((0, 0, 1)))
     )
 
-    # 3. Compute pivot point
+    # 2. Compute pivot point
     if pivot == "WORLD":
         pivot_point = Vector((0, 0, 0))
     elif pivot == "ACTIVE" and context.active_object:
@@ -299,7 +289,7 @@ def create_real_mirror(context, obj, axis_idx, is_neg):
     else:
         pivot_point = Vector((0, 0, 0))
 
-    # 4. Compute rotation from orientation
+    # 3. Compute rotation from orientation
     rot_mat = None
     if orientation == "LOCAL":
         if pivot == "ACTIVE" and context.active_object:
@@ -313,7 +303,7 @@ def create_real_mirror(context, obj, axis_idx, is_neg):
     elif orientation == "CUSTOM":
         rot_mat = Euler(addon.pref().tools.mirror.custom_rotation, "XYZ").to_matrix().to_4x4()
 
-    # 5. Compose mirror_xform = T @ R @ S @ R_inv @ T_inv
+    # 4. Compose mirror_xform = T @ R @ S @ R_inv @ T_inv
     T = Matrix.Translation(pivot_point)
     T_inv = Matrix.Translation(-pivot_point)
     S = mirror_mat
@@ -324,10 +314,28 @@ def create_real_mirror(context, obj, axis_idx, is_neg):
     else:
         mirror_xform = T @ S @ T_inv
 
-    # 6. Apply transform
+    return mirror_xform
+
+
+def create_real_mirror(context, obj, axis_idx, is_neg):
+    """Duplicate object + mesh and flip across the mirror axis.
+
+    Returns the new object or None if the object type is unsupported.
+    """
+    # 1. Duplicate object and mesh data
+    new_obj = obj.copy()
+    if obj.data:
+        new_obj.data = obj.data.copy()
+
+    # Link to same collections
+    for col in obj.users_collection:
+        col.objects.link(new_obj)
+
+    # 2. Apply transform
+    mirror_xform = compute_mirror_xform(context, obj, axis_idx)
     new_obj.matrix_world = mirror_xform @ obj.matrix_world
 
-    # 7. Fix normals — negative scale inverts face winding
+    # 3. Fix normals — negative scale inverts face winding
     if new_obj.type == "MESH" and new_obj.data:
         bm = bmesh.new()
         bm.from_mesh(new_obj.data)
@@ -345,12 +353,22 @@ def execute_real_mirror(operator, context, axis_idx, is_neg, enabled_objects):
     Handles bisect, loop over objects, selection update, and report.
     Returns {'FINISHED'} or {'CANCELLED'}.
     """
+    # Local import to avoid a circular import (mirror_chisel imports from here)
+    from .mirror_chisel import is_chisel_object, create_chisel_real_mirror
+
     pref = addon.pref().tools.mirror
     pivot = pref.pivot
     orientation = pref.orientation
 
     new_objects = []
     for obj in enabled_objects:
+        # Chisel objects: shared-data duplicate, never bisect the SDF base mesh
+        if is_chisel_object(obj):
+            new_obj = create_chisel_real_mirror(context, obj, axis_idx)
+            if new_obj:
+                new_objects.append(new_obj)
+            continue
+
         if pref.bisect:
             bisect_object(obj, axis_idx, pivot, orientation, context, is_neg)
 

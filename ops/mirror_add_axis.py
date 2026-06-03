@@ -2,6 +2,7 @@ import bpy
 from bpy.props import CollectionProperty, IntProperty
 from ..utils import addon
 from .mirror_utils import get_mirror_object, create_mirror_modifier, bisect_object, execute_real_mirror
+from .mirror_chisel import is_chisel_object, add_chisel_mirror
 from .mirror_props import ROTOR_PG_MirrorObjectItem
 
 
@@ -113,6 +114,15 @@ class ROTOR_OT_AddMirrorAxis(bpy.types.Operator):
 
         affected_count = 0
         for obj in enabled_objects:
+            # Chisel objects: add a chisel mirror item instead of a modifier
+            # (chisel mirror inherently bisects, so pref.bisect is skipped)
+            if is_chisel_object(obj):
+                add_chisel_mirror(
+                    context, obj, axis_idx, is_neg, mirror_object, individual
+                )
+                affected_count += 1
+                continue
+
             if pref.bisect:
                 bisect_object(obj, axis_idx, pivot, orientation, context, is_neg)
 
