@@ -29,16 +29,18 @@ def is_chisel_object(obj):
         return False
 
 
-def get_chisel_mirror_item(obj):
+def get_chisel_mirror_item(obj, pinned_only=True):
     """Return (item, index) of the last chisel MIRROR item, or (None, -1).
 
-    The last MIRROR item is the chisel equivalent of rotor's pinned
-    Blender mirror modifier.
+    By default only pinned items match — chisel's `pinned` flag is the
+    equivalent of `use_pin_to_last` on a Blender mirror modifier, so set
+    operations track pinned items only, exactly like the mesh path.
     """
     items = obj.chisel.modifiers.items
     for i in range(len(items) - 1, -1, -1):
-        if items[i].modifier_type == "MIRROR":
-            return items[i], i
+        item = items[i]
+        if item.modifier_type == "MIRROR" and (item.pinned or not pinned_only):
+            return item, i
     return None, -1
 
 
@@ -70,10 +72,14 @@ def toggle_chisel_axis(item, axis_idx, is_neg):
     return any(use_axis)
 
 
-def add_chisel_mirror(context, obj, axis_idx, is_neg, mirror_object, individual):
+def add_chisel_mirror(context, obj, axis_idx, is_neg, mirror_object, individual, pin=False):
     """Add a new chisel mirror item on obj via chisel's operator (which
     handles cache invalidation + proxy-mesh bookkeeping), then configure
-    sign and mirror origin to match rotor's pivot/orientation."""
+    sign and mirror origin to match rotor's pivot/orientation.
+
+    pin=True pins the new item (chisel's use_pin_to_last equivalent) so
+    set operations can track it — the mesh-path parallel of pinning the
+    newly created modifier."""
 
     axis = ("X", "Y", "Z")[axis_idx]
     # Scope to a single object so the operator takes its self-mirror branch
@@ -103,6 +109,14 @@ def add_chisel_mirror(context, obj, axis_idx, is_neg, mirror_object, individual)
         _mirror_object = create_empty_mirror_object(context, obj.location)
     if item.mirror_origin != _mirror_object:
         item.mirror_origin = _mirror_object
+
+    if pin:
+        # Pin last — chisel's operator repositions the item to the pinned
+        # block at the end of the stack (the move invalidates the item
+        # wrapper, so no property writes after this) and handles
+        # invalidation + proxy-mesh bookkeeping.
+        with context.temp_override(active_object=obj):
+            bpy.ops.chisel.toggle_modifier_pin(index=index)
 
 
 def remove_chisel_mirror(context, obj, index):

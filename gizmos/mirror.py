@@ -142,7 +142,7 @@ class ROTOR_GGT_MirrorGizmoGroup(bpy.types.GizmoGroup):
         if active_mesh:
             axis_state = None
             if is_chisel_object(active_mesh):
-                # Chisel objects: read the last chisel mirror item instead
+                # Chisel objects: read the last pinned chisel mirror item
                 chisel_item, _ = get_chisel_mirror_item(active_mesh)
                 if chisel_item:
                     axis_state = chisel_axis_state(chisel_item)

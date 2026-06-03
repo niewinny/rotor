@@ -22,7 +22,7 @@ from .mirror_props import ROTOR_PG_MirrorObjectItem
 
 def detect_is_disabling(active_object, axis_idx, is_neg):
     """Check whether toggling this axis on the active object's tracked mirror
-    (pinned modifier, or last chisel mirror item) would disable it."""
+    (pinned modifier, or pinned chisel mirror item) would disable it."""
     if is_chisel_object(active_object):
         chisel_item, _ = get_chisel_mirror_item(active_object)
         if chisel_item is None:
@@ -53,7 +53,7 @@ def detect_is_disabling(active_object, axis_idx, is_neg):
 def has_mirror_modifier(obj):
     """True if obj already has a mirror (Blender modifier or chisel item)"""
     if is_chisel_object(obj):
-        return get_chisel_mirror_item(obj)[0] is not None
+        return get_chisel_mirror_item(obj, pinned_only=False)[0] is not None
     return any(m.type == "MIRROR" for m in obj.modifiers)
 
 
@@ -235,19 +235,21 @@ class ROTOR_OT_SetMirrorAxis(bpy.types.Operator):
         )
 
         for obj in enabled_objects:
-            # Chisel objects: drive chisel's mirror item instead of a modifier
+            # Chisel objects: drive chisel's pinned mirror item instead of a
+            # pinned modifier
             if is_chisel_object(obj):
                 chisel_item, chisel_index = get_chisel_mirror_item(obj)
 
                 if chisel_item is None:
                     if is_disabling:
-                        # No mirror item to disable - skip this object
+                        # No pinned mirror item to disable - skip this object
                         skipped_count += 1
                         continue
-                    # Enabling - add a new chisel mirror item (chisel mirror
-                    # inherently bisects, so pref.bisect is skipped)
+                    # Enabling - add a new pinned chisel mirror item (chisel
+                    # mirror inherently bisects, so pref.bisect is skipped)
                     add_chisel_mirror(
-                        context, obj, axis_idx, is_neg, mirror_object, individual
+                        context, obj, axis_idx, is_neg, mirror_object, individual,
+                        pin=True,
                     )
                     affected_count += 1
                     continue
