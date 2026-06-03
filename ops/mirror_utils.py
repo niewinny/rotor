@@ -14,6 +14,9 @@ MIRROR_AXIS_TRANSITIONS = {
     (True, False, True): (True, True),  # Switch to negative
     (True, True, False): (True, False),  # Switch to positive
     (True, True, True): (False, False),  # Disable from negative
+    # Stale flip without axis (settable in the modifier UI): treat as off
+    (False, True, False): (True, False),  # Enable positive
+    (False, True, True): (True, True),  # Enable negative
 }
 
 
@@ -180,6 +183,14 @@ def bisect_object(obj, axis_idx, pivot, orientation, context, is_neg=False):
     """Bisect a single object using bmesh.ops.bisect_plane without changing modes"""
 
     if obj.type != "MESH":
+        return
+
+    # Never bisect a chisel object's SDF base mesh — chisel mirror inherently
+    # bisects, and the base mesh is shared by chisel instances.
+    # Local import to avoid a circular import (mirror_chisel imports from here)
+    from .mirror_chisel import is_chisel_object
+
+    if is_chisel_object(obj):
         return
 
     # Get the bisect plane normal vector

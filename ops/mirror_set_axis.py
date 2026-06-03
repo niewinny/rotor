@@ -20,6 +20,43 @@ from .mirror_chisel import (
 from .mirror_props import ROTOR_PG_MirrorObjectItem
 
 
+def detect_is_disabling(active_object, axis_idx, is_neg):
+    """Check whether toggling this axis on the active object's tracked mirror
+    (pinned modifier, or last chisel mirror item) would disable it."""
+    if is_chisel_object(active_object):
+        chisel_item, _ = get_chisel_mirror_item(active_object)
+        if chisel_item is None:
+            return False
+        use_axis, use_flip = chisel_axis_state(chisel_item)
+        current_state = (use_axis[axis_idx], use_flip[axis_idx], is_neg)
+    else:
+        # Only look for pinned mirror modifiers for set operations
+        active_mirror_mod = next(
+            (
+                m
+                for m in reversed(active_object.modifiers)
+                if m.type == "MIRROR" and m.use_pin_to_last
+            ),
+            None,
+        )
+        if active_mirror_mod is None:
+            return False
+        current_state = (
+            active_mirror_mod.use_axis[axis_idx],
+            active_mirror_mod.use_bisect_flip_axis[axis_idx],
+            is_neg,
+        )
+    new_axis, _ = MIRROR_AXIS_TRANSITIONS[current_state]
+    return current_state[0] and not new_axis
+
+
+def has_mirror_modifier(obj):
+    """True if obj already has a mirror (Blender modifier or chisel item)"""
+    if is_chisel_object(obj):
+        return get_chisel_mirror_item(obj)[0] is not None
+    return any(m.type == "MIRROR" for m in obj.modifiers)
+
+
 class ROTOR_OT_SetMirrorAxis(bpy.types.Operator):
     """Add or modify the pinned mirror"""
 
@@ -66,37 +103,7 @@ class ROTOR_OT_SetMirrorAxis(bpy.types.Operator):
                 and active_object.type == "MESH"
                 and active_object.select_get()
             ):
-                if is_chisel_object(active_object):
-                    # Chisel objects: read the last chisel mirror item instead
-                    chisel_item, _ = get_chisel_mirror_item(active_object)
-                    if chisel_item:
-                        use_axis, use_flip = chisel_axis_state(chisel_item)
-                        current_state = (
-                            use_axis[axis_idx],
-                            use_flip[axis_idx],
-                            is_neg,
-                        )
-                        new_axis, _ = MIRROR_AXIS_TRANSITIONS[current_state]
-                        is_disabling = use_axis[axis_idx] and not new_axis
-                else:
-                    # Only look for pinned mirror modifiers for set operations
-                    active_mirror_mod = next(
-                        (
-                            m
-                            for m in reversed(active_object.modifiers)
-                            if m.type == "MIRROR" and m.use_pin_to_last
-                        ),
-                        None,
-                    )
-                    if active_mirror_mod:
-                        # Check if we're trying to disable the axis on the pinned modifier
-                        current_state = (
-                            active_mirror_mod.use_axis[axis_idx],
-                            active_mirror_mod.use_bisect_flip_axis[axis_idx],
-                            is_neg,
-                        )
-                        new_axis, _ = MIRROR_AXIS_TRANSITIONS[current_state]
-                        is_disabling = active_mirror_mod.use_axis[axis_idx] and not new_axis
+                is_disabling = detect_is_disabling(active_object, axis_idx, is_neg)
 
         # Add active object first if it's a mesh and selected
         if (
@@ -109,10 +116,7 @@ class ROTOR_OT_SetMirrorAxis(bpy.types.Operator):
             # Disable active object if include_active is False and pivot is ACTIVE
             item.enabled = pref.include_active or pref.pivot != "ACTIVE"
             # Check if it has a mirror modifier (chisel objects: a mirror item)
-            if is_chisel_object(active_object):
-                has_mirror = get_chisel_mirror_item(active_object)[0] is not None
-            else:
-                has_mirror = any(m.type == "MIRROR" for m in active_object.modifiers)
+            has_mirror = has_mirror_modifier(active_object)
             item.has_mirror_modifier = has_mirror
             if not has_mirror:
                 objects_without_modifiers += 1
@@ -127,10 +131,7 @@ class ROTOR_OT_SetMirrorAxis(bpy.types.Operator):
                 item.name = obj.name
                 item.enabled = True
                 # Check if it has a mirror modifier (chisel objects: a mirror item)
-                if is_chisel_object(obj):
-                    has_mirror = get_chisel_mirror_item(obj)[0] is not None
-                else:
-                    has_mirror = any(m.type == "MIRROR" for m in obj.modifiers)
+                has_mirror = has_mirror_modifier(obj)
                 item.has_mirror_modifier = has_mirror
                 if not has_mirror:
                     objects_without_modifiers += 1
@@ -208,34 +209,7 @@ class ROTOR_OT_SetMirrorAxis(bpy.types.Operator):
         # Only check PINNED modifiers since set operation only affects pinned modifiers
         is_disabling = False
         if active_object and active_object.select_get():
-            if is_chisel_object(active_object):
-                # Chisel objects: read the last chisel mirror item instead
-                chisel_item, _ = get_chisel_mirror_item(active_object)
-                if chisel_item:
-                    use_axis, use_flip = chisel_axis_state(chisel_item)
-                    current_state = (use_axis[axis_idx], use_flip[axis_idx], is_neg)
-                    new_axis, _ = MIRROR_AXIS_TRANSITIONS[current_state]
-                    is_disabling = use_axis[axis_idx] and not new_axis
-            else:
-                # Only look for pinned mirror modifiers for set operations
-                active_mirror_mod = next(
-                    (
-                        m
-                        for m in reversed(active_object.modifiers)
-                        if m.type == "MIRROR" and m.use_pin_to_last
-                    ),
-                    None,
-                )
-
-                if active_mirror_mod:
-                    # Check if we're trying to disable the axis on the pinned modifier
-                    current_state = (
-                        active_mirror_mod.use_axis[axis_idx],
-                        active_mirror_mod.use_bisect_flip_axis[axis_idx],
-                        is_neg,
-                    )
-                    new_axis, _ = MIRROR_AXIS_TRANSITIONS[current_state]
-                    is_disabling = active_mirror_mod.use_axis[axis_idx] and not new_axis
+            is_disabling = detect_is_disabling(active_object, axis_idx, is_neg)
 
         # Get list of enabled objects (shared by both modes)
         enabled_objects = []

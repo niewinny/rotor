@@ -1,5 +1,9 @@
 import bpy
-from .mirror_utils import MIRROR_AXIS_TRANSITIONS, compute_mirror_xform
+from .mirror_utils import (
+    MIRROR_AXIS_TRANSITIONS,
+    compute_mirror_xform,
+    create_empty_mirror_object,
+)
 
 
 # Integration with the Chisel extension (SDF modeling). Chisel objects are
@@ -57,8 +61,11 @@ def toggle_chisel_axis(item, axis_idx, is_neg):
     use_axis, use_flip = chisel_axis_state(item)
     key = (use_axis[axis_idx], use_flip[axis_idx], is_neg)
     new_axis, new_flip = MIRROR_AXIS_TRANSITIONS[key]
-    setattr(item, MIRROR_AXIS_PROPS[axis_idx], new_axis)
-    setattr(item, FLIP_AXIS_PROPS[axis_idx], new_flip)
+    # Write only on change — every write fires chisel's invalidation callback
+    if new_axis != use_axis[axis_idx]:
+        setattr(item, MIRROR_AXIS_PROPS[axis_idx], new_axis)
+    if new_flip != use_flip[axis_idx]:
+        setattr(item, FLIP_AXIS_PROPS[axis_idx], new_flip)
     use_axis[axis_idx] = new_axis
     return any(use_axis)
 
@@ -86,12 +93,16 @@ def add_chisel_mirror(context, obj, axis_idx, is_neg, mirror_object, individual)
 
     # Resolve mirror origin with the same rules as create_mirror_modifier.
     # chisel's mirror_origin matches Blender's mirror_object semantics
-    # (target's local axes + position, None = own origin), so for the
-    # individual case own-origin is equivalent to the per-object empty.
+    # (target's local axes + position, None = own origin). The individual
+    # case needs the same identity-rotation empty as the mesh path —
+    # mirror_origin=None would use the object's own (possibly rotated) axes.
     _mirror_object = mirror_object
-    if mirror_object == obj or individual:
+    if mirror_object == obj:
         _mirror_object = None
-    item.mirror_origin = _mirror_object
+    if individual:
+        _mirror_object = create_empty_mirror_object(context, obj.location)
+    if item.mirror_origin != _mirror_object:
+        item.mirror_origin = _mirror_object
 
 
 def remove_chisel_mirror(context, obj, index):
